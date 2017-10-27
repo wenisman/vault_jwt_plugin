@@ -2,6 +2,8 @@
 
 ## Purpose
 The purpose of this plugin is to allow apps to authenticate through the use of JWT tokens
+This was previously proposed within the vault Git repo... https://github.com/hashicorp/vault/issues/1986
+I will be following the guidelines of the proposal as much as I can whilst trying to make this feasible for applications
 
 ## Workflow
 There will have to be several steps in getting up the apps for authentication, however these can all be done through basic curl requests and so will be fully scriptable through any CICD pipeline
