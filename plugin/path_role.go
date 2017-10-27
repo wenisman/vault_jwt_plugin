@@ -2,6 +2,7 @@ package josejwt
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -67,7 +68,7 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 // to be able to create tokens down the line
 func (backend *jwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
-	role, err := backend.roleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("Error reading role"), err
 	}
@@ -85,7 +86,7 @@ func (backend *jwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	roleID, _ := uuid.NewUUID()
 	storageEntry.RoleID = roleID.String()
 
-	if err := backend.roleSave(req.Storage, storageEntry); err != nil {
+	if err := backend.setRoleEntry(req.Storage, storageEntry); err != nil {
 		return logical.ErrorResponse("Error saving role"), err
 	}
 
@@ -95,8 +96,19 @@ func (backend *jwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	return &logical.Response{Data: roleDetails}, nil
 }
 
-func (backend *jwtBackend) roleSave(storage logical.Storage, role roleStorageEntry) error {
-	entry, err := logical.StorageEntryJSON(fmt.Sprintf("role/%s", role.Name), role)
+// roleSave will persist the role in the data store
+func (backend *jwtBackend) setRoleEntry(storage logical.Storage, role roleStorageEntry) error {
+	if role.Name == "" {
+		return fmt.Errorf("Unable to save, invalid name in role")
+	}
+
+	roleName := strings.ToLower(role.Name)
+	lock := backend.roleLock(roleName)
+
+	lock.RLock()
+	defer lock.RUnlock()
+
+	entry, err := logical.StorageEntryJSON(fmt.Sprintf("role/%s", roleName), role)
 	if err != nil {
 		return fmt.Errorf("Error saving role storage entry: %#v", err)
 	}
@@ -109,12 +121,13 @@ func (backend *jwtBackend) roleSave(storage logical.Storage, role roleStorageEnt
 }
 
 // roleEntry grabs the read lock and fetches the options of an role from the storage
-func (backend *jwtBackend) roleEntry(storage logical.Storage, roleName string) (*roleStorageEntry, error) {
+func (backend *jwtBackend) getRoleEntry(storage logical.Storage, roleName string) (*roleStorageEntry, error) {
 	if roleName == "" {
 		return nil, fmt.Errorf("missing role_name")
 	}
-	lock := backend.roleLock(roleName)
+	roleName = strings.ToLower(roleName)
 
+	lock := backend.roleLock(roleName)
 	lock.RLock()
 	defer lock.RUnlock()
 
