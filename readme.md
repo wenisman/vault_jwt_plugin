@@ -16,3 +16,10 @@ Then your application is able to append the JWT into the **Authorization** heade
 
 ### Validating a token
 1. The JWT is then able to be authenticated and validated by the vault end point, returning either an 200 (OK) or throwing the appropriate error.
+
+## Building
+you can build using the provided `build.sh` 
+to set up the build.sh
+```
+chmod a+x build.sh
+```
