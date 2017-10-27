@@ -25,3 +25,7 @@ to set up the build.sh
 ```
 chmod a+x build.sh
 ```
+
+## Installing
+To use a plugin in vault you must set it up correctly, a little light reading
+https://www.vaultproject.io/docs/plugin/index.html
