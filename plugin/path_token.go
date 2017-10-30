@@ -43,7 +43,7 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 }
 
 // Provides basic token validation for a provided jwt token
-func (backend *jwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	byteToken := []byte(data.Get("token").(string))
 	token, _ := jws.ParseJWT(byteToken)
 
@@ -67,7 +67,7 @@ func (backend *jwtBackend) validateToken(req *logical.Request, data *framework.F
 }
 
 // create the basic jwt token with an expiry wihtin the claim
-func (backend *jwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	aud := data.Get("aud").([]string)
 
 	// TODO : move this logic into an config struct... but im just hackin at the mo
@@ -98,7 +98,7 @@ func (backend *jwtBackend) createToken(req *logical.Request, data *framework.Fie
 	return &logical.Response{Data: tokenOutput}, nil
 }
 
-func pathToken(backend *jwtBackend) []*framework.Path {
+func pathToken(backend *JwtBackend) []*framework.Path {
 	tokenSchema := map[string]*framework.FieldSchema{}
 	for k, v := range createTokenSchema {
 		tokenSchema[k] = v

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
 
 	"github.com/hashicorp/vault/helper/locksutil"
@@ -13,7 +14,7 @@ import (
 )
 
 // structure that represents the role as it is stored within vault
-type roleStorageEntry struct {
+type RoleStorageEntry struct {
 	// `json:"" structs:"" mapstructure:""`
 	// The UUID that defines this role
 	RoleID string `json:"role_id" structs:"role_id" mapstructure:"role_id"`
@@ -26,6 +27,9 @@ type roleStorageEntry struct {
 
 	// The provided name for the role
 	Name string `json:"name" structs:"name" mapstructure:"name"`
+
+	// The secret key used to decode the secret for validation
+	HmacKey string `json:"hmac_key" structs:"hmac_key" mapstructure:"hmac_key"`
 
 	// check if the role is allowed to provide their own claims when requesting a token
 	AllowCustomClaims bool `json:"allow_custom_claims" structs:"allow_custom_claims" mapstructure:"allow_custom_claims"`
@@ -64,9 +68,24 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	},
 }
 
+// read the current role from the inputs and return it if it exists
+func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("name").(string)
+	role, err := backend.getRoleEntry(req.Storage, roleName)
+	if err != nil {
+		return logical.ErrorResponse("Error reading role"), err
+	}
+
+	roleDetails := structs.New(role).Map()
+	delete(roleDetails, "role_id")
+	delete(roleDetails, "hmac_key")
+
+	return &logical.Response{Data: roleDetails}, nil
+}
+
 // create the role within plugin, this will provide the access for applications
 // to be able to create tokens down the line
-func (backend *jwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
 	role, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
@@ -77,7 +96,7 @@ func (backend *jwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		return logical.ErrorResponse(fmt.Sprintf("role with provided name '%s' already exists", roleName)), nil
 	}
 
-	var storageEntry roleStorageEntry
+	var storageEntry RoleStorageEntry
 	if err := mapstructure.Decode(data.Raw, &storageEntry); err != nil {
 		return logical.ErrorResponse("Error decoding role"), err
 	}
@@ -97,7 +116,7 @@ func (backend *jwtBackend) createRole(req *logical.Request, data *framework.Fiel
 }
 
 // roleSave will persist the role in the data store
-func (backend *jwtBackend) setRoleEntry(storage logical.Storage, role roleStorageEntry) error {
+func (backend *JwtBackend) setRoleEntry(storage logical.Storage, role RoleStorageEntry) error {
 	if role.Name == "" {
 		return fmt.Errorf("Unable to save, invalid name in role")
 	}
@@ -110,7 +129,7 @@ func (backend *jwtBackend) setRoleEntry(storage logical.Storage, role roleStorag
 
 	entry, err := logical.StorageEntryJSON(fmt.Sprintf("role/%s", roleName), role)
 	if err != nil {
-		return fmt.Errorf("Error saving role storage entry: %#v", err)
+		return fmt.Errorf("Error converting entry to JSON: %#v", err)
 	}
 
 	if err := storage.Put(entry); err != nil {
@@ -121,9 +140,9 @@ func (backend *jwtBackend) setRoleEntry(storage logical.Storage, role roleStorag
 }
 
 // roleEntry grabs the read lock and fetches the options of an role from the storage
-func (backend *jwtBackend) getRoleEntry(storage logical.Storage, roleName string) (*roleStorageEntry, error) {
+func (backend *JwtBackend) getRoleEntry(storage logical.Storage, roleName string) (*RoleStorageEntry, error) {
 	if roleName == "" {
-		return nil, fmt.Errorf("missing role_name")
+		return nil, fmt.Errorf("missing role name")
 	}
 	roleName = strings.ToLower(roleName)
 
@@ -139,7 +158,7 @@ func (backend *jwtBackend) getRoleEntry(storage logical.Storage, roleName string
 		return nil, nil
 	}
 
-	var result roleStorageEntry
+	var result RoleStorageEntry
 	if err := entry.DecodeJSON(&result); err != nil {
 		return nil, err
 	}
@@ -148,12 +167,12 @@ func (backend *jwtBackend) getRoleEntry(storage logical.Storage, roleName string
 }
 
 // get or create the basic lock for the role name
-func (backend *jwtBackend) roleLock(roleName string) *locksutil.LockEntry {
+func (backend *JwtBackend) roleLock(roleName string) *locksutil.LockEntry {
 	return locksutil.LockForKey(backend.roleLocks, roleName)
 }
 
 // set up the paths for the roles within vault
-func pathRole(backend *jwtBackend) []*framework.Path {
+func pathRole(backend *JwtBackend) []*framework.Path {
 	fieldSchema := map[string]*framework.FieldSchema{}
 	for k, v := range createRoleSchema {
 		fieldSchema[k] = v
@@ -161,10 +180,11 @@ func pathRole(backend *jwtBackend) []*framework.Path {
 
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern: fmt.Sprintf("role/create/%s", framework.GenericNameRegex("name")),
+			Pattern: fmt.Sprintf("role/%s", framework.GenericNameRegex("name")),
 			Fields:  fieldSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
+				logical.ReadOperation:   backend.readRole,
 			},
 		},
 	}
