@@ -55,6 +55,7 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 		Paths: framework.PathAppend(
 			pathToken(backend),
 			pathKeys(backend),
+			pathRole(backend),
 		),
 	}
 

@@ -38,6 +38,7 @@ var createKeySchema = map[string]*framework.FieldSchema{
 	},
 }
 
+// KeyStorageEntry strutcure defines the type of object that is stored
 type KeyStorageEntry struct {
 	// the name of the private key
 	Name string `json:"name" structs:"name" mapstructure:"name"`

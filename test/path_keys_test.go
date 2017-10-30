@@ -31,7 +31,7 @@ func TestCRUDKey(t *testing.T) {
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
-	fmt.Printf("'Test create key' took %s", time.Since(startTime))
+	fmt.Printf("'Test create key' took %s\n", time.Since(startTime))
 
 	/***  TEST GET OPERATION ***/
 	startTime = time.Now()
@@ -50,5 +50,5 @@ func TestCRUDKey(t *testing.T) {
 	} else if returnedKey.Algorithm != "HS256" {
 		t.Fatalf("incorrect algorith returned, not the same as saved value")
 	}
-	fmt.Printf("'Test get key' took %s", time.Since(startTime))
+	fmt.Printf("'Test get key' took %s\n", time.Since(startTime))
 }

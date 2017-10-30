@@ -1,24 +1,24 @@
 package josejwt_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/vault/logical"
 )
 
-func TestCreateToken(t *testing.T) {
+func TestAuthenticateValidateToken(t *testing.T) {
 	b, _ := getTestBackend(t)
 
-	defer timeTrack(time.Now(), "Test create token")
-
+	start := time.Now()
 	data := map[string]interface{}{
 		"aud": []string{"appOne"},
 	}
 
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
-		Path:      "token/authenticate",
+		Path:      "token/issue",
 		Data:      data,
 	}
 
@@ -27,11 +27,13 @@ func TestCreateToken(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	//	t.Logf("returned Data: %#v", resp.Data)
+	fmt.Printf("Authenticate Token took %s", time.Since(start))
 
 	if resp.Data["ClientToken"] == "" {
 		t.Fatal("no token returned")
 	}
+
+	start = time.Now()
 
 	data = map[string]interface{}{
 		"aud":   "appOne",
@@ -48,4 +50,7 @@ func TestCreateToken(t *testing.T) {
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
+
+	fmt.Printf("Validate Token took %s", time.Since(start))
+
 }

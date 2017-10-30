@@ -31,7 +31,7 @@ func TestCRUDRole(t *testing.T) {
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
-	fmt.Printf("'Test create role' took %s", time.Since(startTime))
+	fmt.Printf("'Test create role' took %s\n", time.Since(startTime))
 
 	/***  TEST GET OPERATION ***/
 	startTime = time.Now()
@@ -45,10 +45,10 @@ func TestCRUDRole(t *testing.T) {
 	var returnedRole jwt.RoleStorageEntry
 	err = mapstructure.Decode(resp.Data, &returnedRole)
 
-	if returnedRole.Name != "test_key" {
-		t.Fatalf("incorrect role name returned, not the same as saved value")
+	if returnedRole.Name != "test_role" {
+		t.Fatalf("incorrect role name %s returned, not the same as saved value", returnedRole.Name)
 	} else if returnedRole.TokenType != "jwt" {
 		t.Fatalf("incorrect token type returned, not the same as saved value")
 	}
-	fmt.Printf("'Test get key' took %s", time.Since(startTime))
+	fmt.Printf("'Test get role' took %s\n", time.Since(startTime))
 }

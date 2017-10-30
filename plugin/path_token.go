@@ -91,8 +91,6 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	token := jws.NewJWT(claims, crypto.SigningMethodHS256)
 
 	serializedToken, _ := token.Serialize([]byte("secret"))
-	log.Printf("Serialized token: %s", serializedToken)
-
 	tokenOutput := map[string]interface{}{"ClientToken": string(serializedToken[:])}
 
 	return &logical.Response{Data: tokenOutput}, nil
@@ -110,7 +108,7 @@ func pathToken(backend *JwtBackend) []*framework.Path {
 
 	paths := []*framework.Path{
 		&framework.Path{
-			Pattern: "token/authenticate",
+			Pattern: "token/issue",
 			Fields:  tokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.ReadOperation: backend.createToken,

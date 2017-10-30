@@ -13,7 +13,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-// structure that represents the role as it is stored within vault
+// RoleStorageEntry structure that represents the role as it is stored within vault
 type RoleStorageEntry struct {
 	// `json:"" structs:"" mapstructure:""`
 	// The UUID that defines this role
