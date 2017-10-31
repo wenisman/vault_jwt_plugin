@@ -59,6 +59,9 @@ func (backend *JwtBackend) removeRole(req *logical.Request, data *framework.Fiel
 		return nil, nil
 	}
 
+	// remove the secrets
+	backend.deleteSecretEntry(req.Storage, role.RoleID, role.SecretID)
+
 	// remove the role
 	if err := backend.deleteRoleEntry(req.Storage, roleName); err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Unable to remove role %s", roleName)), err
@@ -78,6 +81,7 @@ func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldD
 	roleDetails := structs.New(role).Map()
 	delete(roleDetails, "role_id")
 	delete(roleDetails, "secret_id")
+	delete(roleDetails, "hmac")
 
 	return &logical.Response{Data: roleDetails}, nil
 }
@@ -103,6 +107,8 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	// set the role ID
 	roleID, _ := uuid.NewUUID()
 	storageEntry.RoleID = roleID.String()
+	salt, _ := backend.Salt();
+	storageEntry.HMAC = salt.GetHMAC(storageEntry.RoleID)
 
 	// create the secret
 	secretEntry, err := backend.createSecret(req.Storage, storageEntry.RoleID, storageEntry.SecretTTL)

@@ -8,58 +8,95 @@ import (
 	"github.com/hashicorp/vault/logical"
 )
 
-func TestAuthenticateValidateToken(t *testing.T) {
+func TestCreateToken(t *testing.T) {
 	b, storage := getTestBackend(t)
-	createSampleRole(b, storage, "test_role")
-	createSampleRole(b, storage, "test_role_two")
-
-	start := time.Now()
-	data := map[string]interface{}{
-		"role_name": "test_role",
-	}
+	roleName := "test_role"
+	resp, _ := createSampleRole(b, storage, roleName)
 
 	req := &logical.Request{
-		Operation: logical.ReadOperation,
-		Path:      "token/issue",
-		Data:      data,
 		Storage:   storage,
 	}
 
-	resp, err := b.HandleRequest(req)
+	// this should not be allowed as the hmac should fail
+	resp, err := createToken(req, b, t, roleName, "abc")
+ 	if err == nil && resp.IsError() != true{
+		t.Fatalf("this should have thrown an error")
+	}
+
+	if resp.Data["error"] != "unauthorized access" {
+		t.Fatalf("unautorized access not detected")
+	}
+}
+
+func TestAuthenticateValidateToken(t *testing.T) {
+	b, storage := getTestBackend(t)
+	roleName := "test_role"
+	resp, _ := createSampleRole(b, storage, roleName)
+
+	roleID := resp.Data["role_id"].(string)
+	req := &logical.Request{
+		Storage:   storage,
+	}
+
+	resp, err := createToken(req, b, t, roleName, roleID)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
-
-	fmt.Printf("Authenticate Token took %s\n", time.Since(start))
 
 	if resp.Data["ClientToken"] == "" {
 		t.Fatal("no token returned\n")
 	}
 
-	data = map[string]interface{}{
-		"token":     resp.Data["ClientToken"],
-		"role_name": "test_role",
+	clientToken := resp.Data["ClientToken"].(string)
+
+	// with a 1 second timeout this should still return a valid token
+	time.Sleep(time.Duration(1) * time.Second)
+	validateToken(req, b, t, clientToken, roleName, true)
+
+	// with a two second timeout this should fail vaildation
+	time.Sleep(time.Duration(2) * time.Second)
+	validateToken(req, b, t, clientToken, roleName, false)
+
+	// now to recreate a token and test its valid once again
+	resp, err = createToken(req, b, t, roleName, roleID)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp.Data["ClientToken"] == "" {
+		t.Fatal("no token returned\n")
+	}
+
+	clientToken = resp.Data["ClientToken"].(string)
+	validateToken(req, b, t, clientToken, roleName, true)
+}
+
+func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string, roleID string) (*logical.Response, error) {
+	data := map[string]interface{}{
+		"role_name": roleName,
+		"role_id": roleID,
+	}
+
+	req.Operation = logical.ReadOperation
+	req.Path =      "token/issue"
+	req.Data =      data
+
+	start := time.Now()
+	resp, err := b.HandleRequest(req)
+	fmt.Printf("Authenticate Token took %s\n", time.Since(start))
+	
+	return resp, err
+}
+
+func validateToken(req *logical.Request, b logical.Backend, t *testing.T, clientToken string, roleName string, result bool) {
+	data := map[string]interface{}{
+		"token":     clientToken,
+		"role_name": roleName,
 	}
 
 	req.Path = "token/validate"
 	req.Data = data
 
-	// with a 1 second timeout this should still return a valid token
-	time.Sleep(time.Duration(1) * time.Second)
-	validateToken(req, b, t, true)
-	validateToken(req, b, t, true)
-	validateToken(req, b, t, true)
-	validateToken(req, b, t, true)
-	validateToken(req, b, t, true)
-	validateToken(req, b, t, true)
-
-	// with a two second timeout this should fail vaildation
-	time.Sleep(time.Duration(2) * time.Second)
-	validateToken(req, b, t, false)
-	validateToken(req, b, t, false)
-}
-
-func validateToken(req *logical.Request, b logical.Backend, t *testing.T, result bool) error {
 	start := time.Now()
 
 	resp, err := b.HandleRequest(req)
@@ -72,8 +109,6 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, result
 	}
 
 	fmt.Printf("Validate Token took %s\n", time.Since(start))
-
-	return nil
 }
 
 func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {

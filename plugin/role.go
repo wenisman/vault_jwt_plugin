@@ -17,6 +17,8 @@ type RoleStorageEntry struct {
 	// The unique identifier pointing to the secret for the role
 	SecretID string `json:"secret_id" structs:"secret_id" mapstructure:"secret_id"`
 
+	HMAC string `json:"hmac" structs:"hmac" mapstructure:"hmac"`
+
 	// The TTL for your secret
 	SecretTTL int `json:"secret_ttl" structs:"secret_ttl" mapstructure:"secret_ttl"`
 

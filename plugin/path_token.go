@@ -37,6 +37,10 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The name of the role to use in the token",
 	},
+	"role_id": {
+		Type:        framework.TypeString,
+		Description: "The unique identifier for the role to use in the token",
+	},
 	"ttl": {
 		Type:        framework.TypeDurationSecond,
 		Description: "The duration in seconds after which the token will expire",
@@ -86,6 +90,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 // create the basic jwt token with an expiry wihtin the claim
 func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role_name").(string)
+	roleID := data.Get("role_id").(string)
 
 	// TODO : move this logic into an config struct... but im just hackin at the mo
 	ttl := data.Get("ttl").(int)
@@ -102,6 +107,13 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 
 	// get the role by name
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
+
+	salt, _ := backend.Salt()
+	hmac := salt.GetHMAC(roleID)
+
+	if hmac != roleEntry.HMAC {
+		return logical.ErrorResponse("unauthorized access"), nil
+	}
 
 	// read the secret for this role
 	secret, err := backend.readSecret(req.Storage, roleEntry.RoleID, roleEntry.SecretID)

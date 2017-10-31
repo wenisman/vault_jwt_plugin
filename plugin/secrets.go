@@ -92,7 +92,7 @@ func (backend *JwtBackend) rotateSecret(storage logical.Storage, roleID string, 
 	}
 
 	secretKey, _ := uuid.NewUUID()
-	salt, err := backend.Salt()
+	salt, _ := backend.Salt()
 	key := salt.GetHMAC(secretKey.String())
 
 	secretEntry, err := backend.getSecretEntry(storage, roleID, secretID)
