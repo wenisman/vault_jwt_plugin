@@ -26,9 +26,7 @@ func getTestBackend(t *testing.T) (logical.Backend, logical.Storage) {
 	config := logical.TestBackendConfig()
 	config.StorageView = &logical.InmemStorage{}
 
-	b := jwt.Backend(config)
-
-	err := b.Setup(config)
+	b, err := jwt.Factory(config)
 	if err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}

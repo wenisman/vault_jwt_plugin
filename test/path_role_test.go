@@ -14,7 +14,7 @@ import (
 func TestCRUDRole(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	/***  TEST SET OPERATION ***/
+	/***  TEST Create Role OPERATION ***/
 	startTime := time.Now()
 	data := map[string]interface{}{
 		"token_type": "jwt",
@@ -46,9 +46,19 @@ func TestCRUDRole(t *testing.T) {
 	err = mapstructure.Decode(resp.Data, &returnedRole)
 
 	if returnedRole.Name != "test_role" {
-		t.Fatalf("incorrect role name %s returned, not the same as saved value", returnedRole.Name)
+		t.Fatalf("incorrect role name %s returned, not the same as saved value \n", returnedRole.Name)
 	} else if returnedRole.TokenType != "jwt" {
-		t.Fatalf("incorrect token type returned, not the same as saved value")
+		t.Fatalf("incorrect token type returned, not the same as saved value \n")
 	}
 	fmt.Printf("'Test get role' took %s\n", time.Since(startTime))
+
+	/***  TEST Delete OPERATION ***/
+	startTime = time.Now()
+	req.Operation = logical.DeleteOperation
+
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	fmt.Printf("'Test delete role' took %s\n", time.Since(startTime))
 }

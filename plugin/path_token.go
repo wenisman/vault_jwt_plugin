@@ -1,7 +1,6 @@
 package josejwt
 
 import (
-	"log"
 	"time"
 
 	"github.com/SermoDigital/jose/crypto"
@@ -13,9 +12,9 @@ import (
 // basic schema for the validation of the token,
 // this will map the fields coming in from the vault request field map
 var validateTokenSchema = map[string]*framework.FieldSchema{
-	"aud": {
-		Type:        framework.TypeCommaStringSlice,
-		Description: "The intended endpoints of the token to validate the claim",
+	"role_name": {
+		Type:        framework.TypeString,
+		Description: "The role associated with this token",
 	},
 	"token": {
 		Type:        framework.TypeString,
@@ -26,9 +25,17 @@ var validateTokenSchema = map[string]*framework.FieldSchema{
 // basic schema for the creation of the token,
 // this will map the fields coming in from the vault request field map
 var createTokenSchema = map[string]*framework.FieldSchema{
-	"aud": {
+	"claims": {
 		Type:        framework.TypeCommaStringSlice,
-		Description: "The intended endpoints of the token to validate the claim",
+		Description: "The custom claims that are aplied to the token",
+	},
+	"payload": {
+		Type:        framework.TypeCommaStringSlice,
+		Description: "The custom payload applied to the token",
+	},
+	"role_name": {
+		Type:        framework.TypeString,
+		Description: "The name of the role to use in the token",
 	},
 	"ttl": {
 		Type:        framework.TypeDurationSecond,
@@ -44,21 +51,31 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 
 // Provides basic token validation for a provided jwt token
 func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("role_name").(string)
+
+	role, err := backend.getRoleEntry(req.Storage, roleName)
+	if err != nil {
+		return logical.ErrorResponse("unable to retrieve role details"), err
+	}
+
+	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	if err != nil {
+		return logical.ErrorResponse("unable to retrieve role secrets"), err
+	} else if secret == nil {
+		validation := map[string]interface{}{
+			"is_valid": false,
+		}
+
+		return &logical.Response{Data: validation}, nil
+	}
+
 	byteToken := []byte(data.Get("token").(string))
 	token, _ := jws.ParseJWT(byteToken)
 
-	err := token.Validate([]byte("secret"), crypto.SigningMethodHS256)
+	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
 		return logical.ErrorResponse("Invalid Token"), nil
 	}
-
-	claims, ok := token.Claims().Audience()
-	if !ok {
-		return logical.ErrorResponse("Invalid Claims on token"), nil
-	}
-
-	// TODO : validate the claims
-	log.Printf("Returned Claims %s", claims)
 
 	validation := map[string]interface{}{
 		"is_valid": true,
@@ -68,7 +85,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 
 // create the basic jwt token with an expiry wihtin the claim
 func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	aud := data.Get("aud").([]string)
+	roleName := data.Get("role_name").(string)
 
 	// TODO : move this logic into an config struct... but im just hackin at the mo
 	ttl := data.Get("ttl").(int)
@@ -78,19 +95,26 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 		ttl = maxTTL
 	}
 
-	if len(aud) == 0 {
-		return logical.ErrorResponse("No specified Audience"), nil
-	}
-
 	claims := jws.Claims{}
-	for _, a := range aud {
-		claims.SetAudience(a)
-	}
 
 	claims.SetExpiration(time.Now().UTC().Add(time.Duration(ttl) * time.Second))
 	token := jws.NewJWT(claims, crypto.SigningMethodHS256)
 
-	serializedToken, _ := token.Serialize([]byte("secret"))
+	// get the role by name
+	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
+
+	// read the secret for this role
+	secret, err := backend.readSecret(req.Storage, roleEntry.RoleID, roleEntry.SecretID)
+	if err != nil {
+		return logical.ErrorResponse("Error retrieving secrets"), err
+	} else if secret == nil {
+		secret, err = backend.rotateSecret(req.Storage, roleEntry.RoleID, roleEntry.SecretID, roleEntry.SecretTTL)
+		if err != nil {
+			return logical.ErrorResponse("Error retrieving secrets"), err
+		}
+	}
+
+	serializedToken, _ := token.Serialize([]byte(secret.Key))
 	tokenOutput := map[string]interface{}{"ClientToken": string(serializedToken[:])}
 
 	return &logical.Response{Data: tokenOutput}, nil

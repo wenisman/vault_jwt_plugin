@@ -2,44 +2,14 @@ package josejwt
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 
-	"github.com/hashicorp/vault/helper/locksutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 	"github.com/mitchellh/mapstructure"
 )
-
-// RoleStorageEntry structure that represents the role as it is stored within vault
-type RoleStorageEntry struct {
-	// `json:"" structs:"" mapstructure:""`
-	// The UUID that defines this role
-	RoleID string `json:"role_id" structs:"role_id" mapstructure:"role_id"`
-
-	// The unique identifier pointing to the secret for the role
-	SecretID string `json:"secret_id" structs:"secret_id" mapstructure:"secret_id"`
-
-	// The type of token to be created for the role
-	TokenType string `json:"token_type" structs:"token_type" mapstructure:"token_type"`
-
-	// The provided name for the role
-	Name string `json:"name" structs:"name" mapstructure:"name"`
-
-	// The secret key used to decode the secret for validation
-	HmacKey string `json:"hmac_key" structs:"hmac_key" mapstructure:"hmac_key"`
-
-	// check if the role is allowed to provide their own claims when requesting a token
-	AllowCustomClaims bool `json:"allow_custom_claims" structs:"allow_custom_claims" mapstructure:"allow_custom_claims"`
-
-	// check if the role is allowed to provide their own payloads when requesting a token
-	AllowCustomPayload bool `json:"allow_custom_payload" structs:"allow_custom_payload" mapstructure:"allow_custom_payload"`
-
-	// the default claims that will be appended to the role tokens
-	Claims map[string]string `json:"claims" structs:"claims" mapstructure:"claims"`
-}
 
 // basic schema for the creation of the role, this will map the fields coming in from the
 // vault request field map
@@ -47,6 +17,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	"name": {
 		Type:        framework.TypeString,
 		Description: "The name of the role to be created",
+	},
+	"secret_ttl": {
+		Type:        framework.TypeDurationSecond,
+		Description: "The TTL of the secret",
+		Default:     600,
 	},
 	"token_type": {
 		Type:        framework.TypeString,
@@ -68,6 +43,30 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	},
 }
 
+// remove the specified role from the storage
+func (backend *JwtBackend) removeRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	roleName := data.Get("name").(string)
+	if roleName == "" {
+		return logical.ErrorResponse("Unable to remove, missing role name"), nil
+	}
+
+	// get the role to make sure it exists and to get the role id
+	role, err := backend.getRoleEntry(req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, nil
+	}
+
+	// remove the role
+	if err := backend.deleteRoleEntry(req.Storage, roleName); err != nil {
+		return logical.ErrorResponse(fmt.Sprintf("Unable to remove role %s", roleName)), err
+	}
+
+	return &logical.Response{}, nil
+}
+
 // read the current role from the inputs and return it if it exists
 func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
@@ -78,7 +77,7 @@ func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldD
 
 	roleDetails := structs.New(role).Map()
 	delete(roleDetails, "role_id")
-	delete(roleDetails, "hmac_key")
+	delete(roleDetails, "secret_id")
 
 	return &logical.Response{Data: roleDetails}, nil
 }
@@ -93,7 +92,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	}
 
 	if role != nil {
-		return logical.ErrorResponse(fmt.Sprintf("role with provided name '%s' already exists", roleName)), nil
+		return logical.ErrorResponse(fmt.Sprintf("role with name '%s' already exists", roleName)), nil
 	}
 
 	var storageEntry RoleStorageEntry
@@ -105,6 +104,10 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	roleID, _ := uuid.NewUUID()
 	storageEntry.RoleID = roleID.String()
 
+	// create the secret
+	secretEntry, err := backend.createSecret(req.Storage, storageEntry.RoleID, storageEntry.SecretTTL)
+	storageEntry.SecretID = secretEntry.ID
+
 	if err := backend.setRoleEntry(req.Storage, storageEntry); err != nil {
 		return logical.ErrorResponse("Error saving role"), err
 	}
@@ -113,62 +116,6 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		"role_id": storageEntry.RoleID,
 	}
 	return &logical.Response{Data: roleDetails}, nil
-}
-
-// roleSave will persist the role in the data store
-func (backend *JwtBackend) setRoleEntry(storage logical.Storage, role RoleStorageEntry) error {
-	if role.Name == "" {
-		return fmt.Errorf("Unable to save, invalid name in role")
-	}
-
-	roleName := strings.ToLower(role.Name)
-	lock := backend.roleLock(roleName)
-
-	lock.RLock()
-	defer lock.RUnlock()
-
-	entry, err := logical.StorageEntryJSON(fmt.Sprintf("role/%s", roleName), role)
-	if err != nil {
-		return fmt.Errorf("Error converting entry to JSON: %#v", err)
-	}
-
-	if err := storage.Put(entry); err != nil {
-		return fmt.Errorf("Error saving role: %#v", err)
-	}
-
-	return nil
-}
-
-// roleEntry grabs the read lock and fetches the options of an role from the storage
-func (backend *JwtBackend) getRoleEntry(storage logical.Storage, roleName string) (*RoleStorageEntry, error) {
-	if roleName == "" {
-		return nil, fmt.Errorf("missing role name")
-	}
-	roleName = strings.ToLower(roleName)
-
-	lock := backend.roleLock(roleName)
-	lock.RLock()
-	defer lock.RUnlock()
-
-	entry, err := storage.Get(fmt.Sprintf("role/%s", roleName))
-	if err != nil {
-		return nil, err
-	}
-	if entry == nil {
-		return nil, nil
-	}
-
-	var result RoleStorageEntry
-	if err := entry.DecodeJSON(&result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
-// get or create the basic lock for the role name
-func (backend *JwtBackend) roleLock(roleName string) *locksutil.LockEntry {
-	return locksutil.LockForKey(backend.roleLocks, roleName)
 }
 
 // set up the paths for the roles within vault
@@ -185,6 +132,7 @@ func pathRole(backend *JwtBackend) []*framework.Path {
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
 				logical.ReadOperation:   backend.readRole,
+				logical.DeleteOperation: backend.removeRole,
 			},
 		},
 	}

@@ -9,17 +9,20 @@ import (
 )
 
 func TestAuthenticateValidateToken(t *testing.T) {
-	b, _ := getTestBackend(t)
+	b, storage := getTestBackend(t)
+	createSampleRole(b, storage, "test_role")
+	createSampleRole(b, storage, "test_role_two")
 
 	start := time.Now()
 	data := map[string]interface{}{
-		"aud": []string{"appOne"},
+		"role_name": "test_role",
 	}
 
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
 		Path:      "token/issue",
 		Data:      data,
+		Storage:   storage,
 	}
 
 	resp, err := b.HandleRequest(req)
@@ -27,30 +30,63 @@ func TestAuthenticateValidateToken(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	fmt.Printf("Authenticate Token took %s", time.Since(start))
+	fmt.Printf("Authenticate Token took %s\n", time.Since(start))
 
 	if resp.Data["ClientToken"] == "" {
-		t.Fatal("no token returned")
+		t.Fatal("no token returned\n")
 	}
-
-	start = time.Now()
 
 	data = map[string]interface{}{
-		"aud":   "appOne",
-		"token": resp.Data["ClientToken"],
+		"token":     resp.Data["ClientToken"],
+		"role_name": "test_role",
 	}
 
-	req = &logical.Request{
-		Operation: logical.ReadOperation,
-		Path:      "token/validate",
-		Data:      data,
-	}
+	req.Path = "token/validate"
+	req.Data = data
+
+	// with a 1 second timeout this should still return a valid token
+	time.Sleep(time.Duration(1) * time.Second)
+	start = time.Now()
 
 	resp, err = b.HandleRequest(req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	fmt.Printf("Validate Token took %s", time.Since(start))
+	if resp.Data["is_valid"] == false {
+		t.Fatalf("Token is not valid")
+	}
 
+	fmt.Printf("Validate Token took %s\n", time.Since(start))
+
+	// with a two second timeout this should fail vaildation
+	time.Sleep(time.Duration(2) * time.Second)
+	start = time.Now()
+	resp, err = b.HandleRequest(req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp.Data["is_valid"] == true {
+		t.Fatalf("Token should not be valid")
+	}
+
+	fmt.Printf("Validate Token took %s\n", time.Since(start))
+
+}
+
+func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
+	data := map[string]interface{}{
+		"token_type": "jwt",
+		"secret_ttl": 2,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      fmt.Sprintf("role/%s", roleName),
+		Storage:   storage,
+		Data:      data,
+	}
+
+	return b.HandleRequest(req)
 }
