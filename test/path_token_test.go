@@ -46,33 +46,34 @@ func TestAuthenticateValidateToken(t *testing.T) {
 
 	// with a 1 second timeout this should still return a valid token
 	time.Sleep(time.Duration(1) * time.Second)
-	start = time.Now()
-
-	resp, err = b.HandleRequest(req)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
-
-	if resp.Data["is_valid"] == false {
-		t.Fatalf("Token is not valid")
-	}
-
-	fmt.Printf("Validate Token took %s\n", time.Since(start))
+	validateToken(req, b, t, true)
+	validateToken(req, b, t, true)
+	validateToken(req, b, t, true)
+	validateToken(req, b, t, true)
+	validateToken(req, b, t, true)
+	validateToken(req, b, t, true)
 
 	// with a two second timeout this should fail vaildation
 	time.Sleep(time.Duration(2) * time.Second)
-	start = time.Now()
-	resp, err = b.HandleRequest(req)
+	validateToken(req, b, t, false)
+	validateToken(req, b, t, false)
+}
+
+func validateToken(req *logical.Request, b logical.Backend, t *testing.T, result bool) error {
+	start := time.Now()
+
+	resp, err := b.HandleRequest(req)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	if resp.Data["is_valid"] == true {
-		t.Fatalf("Token should not be valid")
+	if resp.Data["is_valid"] != result {
+		t.Fatalf("incorrect validation result")
 	}
 
 	fmt.Printf("Validate Token took %s\n", time.Since(start))
 
+	return nil
 }
 
 func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
