@@ -122,7 +122,7 @@ func (backend *JwtBackend) getSecretEntry(storage logical.Storage, roleID string
 	}
 
 	// lock := backend.secretLock(secretID)
-	// lock.Lock()
+	// lock.RLock()
 	// defer lock.RUnlock()
 
 	var result secretStorageEntry
@@ -147,9 +147,9 @@ func (backend *JwtBackend) setSecretEntry(storage logical.Storage, entry *secret
 		return fmt.Errorf("Secrets ID is not specified")
 	}
 
-	// lock := backend.secretLock(entry.ID)
-	// lock.Lock()
-	// defer lock.RUnlock()
+	lock := backend.secretLock(entry.ID)
+	lock.RLock()
+	defer lock.RUnlock()
 
 	path := fmt.Sprintf("secrets/%s/%s", entry.RoleID, entry.ID)
 	json, err := logical.StorageEntryJSON(path, entry)
@@ -173,9 +173,9 @@ func (backend *JwtBackend) deleteSecretEntry(storage logical.Storage, roleID str
 		return fmt.Errorf("secret ID is not set")
 	}
 
-	// lock := backend.secretLock(secretID)
-	// lock.Lock()
-	// defer lock.RUnlock()
+	lock := backend.secretLock(secretID)
+	lock.RLock()
+	defer lock.RUnlock()
 
 	return storage.Delete(fmt.Sprintf("secrets/%s/%s", roleID, secretID))
 }

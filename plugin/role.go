@@ -88,10 +88,6 @@ func (backend *JwtBackend) getRoleEntry(storage logical.Storage, roleName string
 	}
 	roleName = strings.ToLower(roleName)
 
-	lock := backend.roleLock(roleName)
-	lock.RLock()
-	defer lock.RUnlock()
-
 	var result RoleStorageEntry
 	if entry, err := storage.Get(fmt.Sprintf("role/%s", roleName)); err != nil {
 		return nil, err

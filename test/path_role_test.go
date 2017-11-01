@@ -14,30 +14,21 @@ import (
 func TestCRUDRole(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	/***  TEST Create Role OPERATION ***/
-	startTime := time.Now()
-	data := map[string]interface{}{
-		"token_type": "jwt",
-	}
-
+	/***  TEST CREATE OPERATION ***/
 	req := &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "role/test_role",
-		Storage:   storage,
-		Data:      data,
+		Storage: storage,
 	}
 
-	resp, err := b.HandleRequest(req)
+	resp, err := createRole(req, b, t, "test_role")
+	resp, err = createRole(req, b, t, "test_role_two")
+	resp, err = createRole(req, b, t, "test_role_three")
+
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
-	fmt.Printf("'Test create role' took %s\n", time.Since(startTime))
 
 	/***  TEST GET OPERATION ***/
-	startTime = time.Now()
-
-	req.Operation = logical.ReadOperation
-	resp, err = b.HandleRequest(req)
+	resp, err = getRole(req, b, t, "test_role")
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -50,15 +41,57 @@ func TestCRUDRole(t *testing.T) {
 	} else if returnedRole.TokenType != "jwt" {
 		t.Fatalf("incorrect token type returned, not the same as saved value \n")
 	}
-	fmt.Printf("'Test get role' took %s\n", time.Since(startTime))
 
 	/***  TEST Delete OPERATION ***/
-	startTime = time.Now()
-	req.Operation = logical.DeleteOperation
-
-	resp, err = b.HandleRequest(req)
+	resp, err = deleteRole(req, b, t, "test_role")
+	resp, err = deleteRole(req, b, t, "test_role_two")
+	resp, err = deleteRole(req, b, t, "test_role_three")
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
+}
+
+func createRole(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
+	data := map[string]interface{}{
+		"token_type": "jwt",
+	}
+
+	req.Operation = logical.CreateOperation
+	req.Path = fmt.Sprintf("role/%s", roleName)
+	req.Data = data
+
+	startTime := time.Now()
+	resp, err := b.HandleRequest(req)
+	fmt.Printf("'Test create role' took %s\n", time.Since(startTime))
+	return resp, err
+}
+
+func getRole(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
+	data := map[string]interface{}{
+		"token_type": "jwt",
+	}
+
+	req.Operation = logical.ReadOperation
+	req.Path = fmt.Sprintf("role/%s", roleName)
+	req.Data = data
+
+	startTime := time.Now()
+	resp, err := b.HandleRequest(req)
+	fmt.Printf("'Test get role' took %s\n", time.Since(startTime))
+	return resp, err
+}
+
+func deleteRole(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
+	data := map[string]interface{}{
+		"token_type": "jwt",
+	}
+
+	req.Operation = logical.ReadOperation
+	req.Path = fmt.Sprintf("role/%s", roleName)
+	req.Data = data
+
+	startTime := time.Now()
+	resp, err := b.HandleRequest(req)
 	fmt.Printf("'Test delete role' took %s\n", time.Since(startTime))
+	return resp, err
 }

@@ -1,12 +1,11 @@
 package josejwt
 
 import (
-	"time"
-
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/mitchellh/mapstructure"
 )
 
 // basic schema for the validation of the token,
@@ -46,11 +45,6 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 		Description: "The duration in seconds after which the token will expire",
 		Default:     600, // default of 10 minutes
 	},
-	"max_ttl": {
-		Type:        framework.TypeDurationSecond,
-		Default:     3600, // default 1 hour
-		Description: "The maximum duration of tokens issued.",
-	},
 }
 
 // Provides basic token validation for a provided jwt token
@@ -74,9 +68,9 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 	}
 
 	byteToken := []byte(data.Get("token").(string))
-	token, _ := jws.ParseJWT(byteToken)
+	token, _ := jws.Parse(byteToken)
 
-	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
+	err = token.Verify([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
 		return logical.ErrorResponse("Invalid Token"), nil
 	}
@@ -92,21 +86,11 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	roleName := data.Get("role_name").(string)
 	roleID := data.Get("role_id").(string)
 
-	// TODO : move this logic into an config struct... but im just hackin at the mo
-	ttl := data.Get("ttl").(int)
-	maxTTL := data.Get("max_ttl").(int)
-
-	if maxTTL < ttl {
-		ttl = maxTTL
-	}
-
-	claims := jws.Claims{}
-
-	claims.SetExpiration(time.Now().UTC().Add(time.Duration(ttl) * time.Second))
-	token := jws.NewJWT(claims, crypto.SigningMethodHS256)
-
 	// get the role by name
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
+	if err != nil {
+		return logical.ErrorResponse("Role note recognised"), nil
+	}
 
 	salt, _ := backend.Salt()
 	hmac := salt.GetHMAC(roleID)
@@ -115,21 +99,17 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 		return logical.ErrorResponse("unauthorized access"), nil
 	}
 
-	// read the secret for this role
-	secret, err := backend.readSecret(req.Storage, roleEntry.RoleID, roleEntry.SecretID)
-	if err != nil {
-		return logical.ErrorResponse("Error retrieving secrets"), err
-	} else if secret == nil {
-		secret, err = backend.rotateSecret(req.Storage, roleEntry.RoleID, roleEntry.SecretID, roleEntry.SecretTTL)
-		if err != nil {
-			return logical.ErrorResponse("Error retrieving secrets"), err
-		}
+	var tokenEntry TokenCreateEntry
+	if err := mapstructure.Decode(data.Raw, &tokenEntry); err != nil {
+		return logical.ErrorResponse("Error decoding role"), err
 	}
 
-	serializedToken, _ := token.Serialize([]byte(secret.Key))
-	tokenOutput := map[string]interface{}{"ClientToken": string(serializedToken[:])}
+	token, err := backend.createTokenEntry(req.Storage, tokenEntry, roleEntry)
+	if err != nil {
+		return logical.ErrorResponse("Error creating token"), err
+	}
 
-	return &logical.Response{Data: tokenOutput}, nil
+	return &logical.Response{Data: token}, nil
 }
 
 func pathToken(backend *JwtBackend) []*framework.Path {

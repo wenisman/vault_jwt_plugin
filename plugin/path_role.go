@@ -107,7 +107,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	// set the role ID
 	roleID, _ := uuid.NewUUID()
 	storageEntry.RoleID = roleID.String()
-	salt, _ := backend.Salt();
+	salt, _ := backend.Salt()
 	storageEntry.HMAC = salt.GetHMAC(storageEntry.RoleID)
 
 	// create the secret

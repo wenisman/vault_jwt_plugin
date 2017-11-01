@@ -8,18 +8,18 @@ import (
 	"github.com/hashicorp/vault/logical"
 )
 
-func TestCreateToken(t *testing.T) {
+func TestCreateBadAuthToken(t *testing.T) {
 	b, storage := getTestBackend(t)
 	roleName := "test_role"
 	resp, _ := createSampleRole(b, storage, roleName)
 
 	req := &logical.Request{
-		Storage:   storage,
+		Storage: storage,
 	}
 
 	// this should not be allowed as the hmac should fail
 	resp, err := createToken(req, b, t, roleName, "abc")
- 	if err == nil && resp.IsError() != true{
+	if err == nil && resp.IsError() != true {
 		t.Fatalf("this should have thrown an error")
 	}
 
@@ -28,14 +28,14 @@ func TestCreateToken(t *testing.T) {
 	}
 }
 
-func TestAuthenticateValidateToken(t *testing.T) {
+func TestIssueValidateToken(t *testing.T) {
 	b, storage := getTestBackend(t)
 	roleName := "test_role"
 	resp, _ := createSampleRole(b, storage, roleName)
 
 	roleID := resp.Data["role_id"].(string)
 	req := &logical.Request{
-		Storage:   storage,
+		Storage: storage,
 	}
 
 	resp, err := createToken(req, b, t, roleName, roleID)
@@ -51,6 +51,11 @@ func TestAuthenticateValidateToken(t *testing.T) {
 
 	// with a 1 second timeout this should still return a valid token
 	time.Sleep(time.Duration(1) * time.Second)
+	validateToken(req, b, t, clientToken, roleName, true)
+	validateToken(req, b, t, clientToken, roleName, true)
+	validateToken(req, b, t, clientToken, roleName, true)
+	validateToken(req, b, t, clientToken, roleName, true)
+	validateToken(req, b, t, clientToken, roleName, true)
 	validateToken(req, b, t, clientToken, roleName, true)
 
 	// with a two second timeout this should fail vaildation
@@ -73,18 +78,19 @@ func TestAuthenticateValidateToken(t *testing.T) {
 
 func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string, roleID string) (*logical.Response, error) {
 	data := map[string]interface{}{
-		"role_name": roleName,
-		"role_id": roleID,
+		"role_name":  roleName,
+		"role_id":    roleID,
+		"token_type": "jwt",
 	}
 
 	req.Operation = logical.ReadOperation
-	req.Path =      "token/issue"
-	req.Data =      data
+	req.Path = "token/issue"
+	req.Data = data
 
 	start := time.Now()
 	resp, err := b.HandleRequest(req)
-	fmt.Printf("Authenticate Token took %s\n", time.Since(start))
-	
+	fmt.Printf("Issue Token took %s\n", time.Since(start))
+
 	return resp, err
 }
 
@@ -100,6 +106,7 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 	start := time.Now()
 
 	resp, err := b.HandleRequest(req)
+	fmt.Printf("Validate Token took %s\n", time.Since(start))
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -107,8 +114,6 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 	if resp.Data["is_valid"] != result {
 		t.Fatalf("incorrect validation result")
 	}
-
-	fmt.Printf("Validate Token took %s\n", time.Since(start))
 }
 
 func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
