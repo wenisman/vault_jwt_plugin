@@ -1,12 +1,16 @@
 package josejwt
 
 import (
+	"log"
+	"os"
 	"sync"
 
 	"github.com/hashicorp/vault/helper/locksutil"
+	"github.com/hashicorp/vault/helper/pluginutil"
 	"github.com/hashicorp/vault/helper/salt"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/hashicorp/vault/logical/plugin"
 )
 
 // JwtBackend export type backend for use else where
@@ -34,19 +38,6 @@ func Factory(conf *logical.BackendConfig) (logical.Backend, error) {
 		return nil, err
 	}
 	return b, nil
-}
-
-// FactoryType is a wrapper func that allows the Factory func to specify
-// the backend type for the mock backend plugin instance.
-func FactoryType(backendType logical.BackendType) func(*logical.BackendConfig) (logical.Backend, error) {
-	return func(conf *logical.BackendConfig) (logical.Backend, error) {
-		b := Backend(conf)
-		b.BackendType = backendType
-		if err := b.Setup(conf); err != nil {
-			return nil, err
-		}
-		return b, nil
-	}
 }
 
 // Salt create the Salt for encrypting the keys
@@ -103,4 +94,21 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 	}
 
 	return backend
+}
+
+// the main app, this will accept the api meta data and tokens from vault
+func main() {
+	apiClientMeta := &pluginutil.APIClientMeta{}
+	flags := apiClientMeta.FlagSet()
+	flags.Parse(os.Args[1:])
+
+	tlsConfig := apiClientMeta.GetTLSConfig()
+	tlsProviderFunc := pluginutil.VaultPluginTLSProvider(tlsConfig)
+
+	if err := plugin.Serve(&plugin.ServeOpts{
+		BackendFactoryFunc: Factory,
+		TLSProviderFunc:    tlsProviderFunc,
+	}); err != nil {
+		log.Fatal(err)
+	}
 }
