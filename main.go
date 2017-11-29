@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/hashicorp/vault/helper/pluginutil"
-	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/plugin"
 	"github.com/wenisman/vault_jwt_plugin/plugin"
 )
@@ -18,7 +17,7 @@ func main() {
 	tlsConfig := apiClientMeta.GetTLSConfig()
 	tlsProviderFunc := pluginutil.VaultPluginTLSProvider(tlsConfig)
 
-	factoryFunc := josejwt.FactoryType(logical.TypeLogical)
+	factoryFunc := josejwt.Factory
 
 	err := plugin.Serve(&plugin.ServeOpts{
 		BackendFactoryFunc: factoryFunc,
