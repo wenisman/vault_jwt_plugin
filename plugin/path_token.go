@@ -49,7 +49,17 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 
 // Provides basic token validation for a provided jwt token
 func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	byteToken := []byte(data.Get("token").(string))
+	token, err := jws.ParseJWT(byteToken)
+
+	if err != nil {
+		return logical.ErrorResponse("unable to parse token"), err
+	}
+
 	roleName := data.Get("role_name").(string)
+	if roleName == "" {
+		roleName = token.Claims().Get("roleName").(string)
+	}
 
 	role, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
@@ -67,12 +77,10 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		return &logical.Response{Data: validation}, nil
 	}
 
-	byteToken := []byte(data.Get("token").(string))
-	token, _ := jws.Parse(byteToken)
-
-	err = token.Verify([]byte(secret.Key), crypto.SigningMethodHS256)
+	//err = token.Verify([]byte(secret.Key), crypto.SigningMethodHS256)
+	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
-		return logical.ErrorResponse("Invalid Token"), nil
+		return logical.ErrorResponse("Invalid Token"), err
 	}
 
 	validation := map[string]interface{}{
@@ -103,6 +111,7 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	if err := mapstructure.Decode(data.Raw, &tokenEntry); err != nil {
 		return logical.ErrorResponse("Error decoding role"), err
 	}
+	tokenEntry.TTL = roleEntry.TokenTTL
 
 	token, err := backend.createTokenEntry(req.Storage, tokenEntry, roleEntry)
 	if err != nil {

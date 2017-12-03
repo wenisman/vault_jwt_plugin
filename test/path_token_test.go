@@ -2,6 +2,7 @@ package josejwt_test
 
 import (
 	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -48,6 +49,7 @@ func TestIssueValidateToken(t *testing.T) {
 	}
 
 	clientToken := resp.Data["ClientToken"].(string)
+	log.Println(clientToken)
 
 	// with a 1 second timeout this should still return a valid token
 	time.Sleep(time.Duration(1) * time.Second)
@@ -108,7 +110,11 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 	resp, err := b.HandleRequest(req)
 	fmt.Printf("Validate Token took %s\n", time.Since(start))
 	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
+		if err.Error() != "token is expired" {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		} else {
+			return
+		}
 	}
 
 	if resp.Data["is_valid"] != result {
@@ -119,7 +125,7 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"token_type": "jwt",
-		"secret_ttl": 2,
+		"token_ttl":  2,
 	}
 
 	req := &logical.Request{

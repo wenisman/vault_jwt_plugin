@@ -10,11 +10,10 @@ import (
 )
 
 type secretStorageEntry struct {
-	ID             string    `json:"id" structs:"id" mapstructure:"id"`
-	Key            string    `json:"Key" structs:"Key" mapstructure:"Key"`
-	RoleID         string    `json:"role_id" structs:"role_id" mapstructure:"role_id"`
-	CreationTime   time.Time `json:"creation_time" structs:"creation_time" mapstructure:"creation_time"`
-	ExpirationTime time.Time `json:"expiration_time" structs:"expiration_time" mapstructure:"expiration_time"`
+	ID           string    `json:"id" structs:"id" mapstructure:"id"`
+	Key          string    `json:"Key" structs:"Key" mapstructure:"Key"`
+	RoleID       string    `json:"role_id" structs:"role_id" mapstructure:"role_id"`
+	CreationTime time.Time `json:"creation_time" structs:"creation_time" mapstructure:"creation_time"`
 }
 
 // get or create the basic lock for the secrets
@@ -22,7 +21,7 @@ func (backend *JwtBackend) secretLock(secretID string) *locksutil.LockEntry {
 	return locksutil.LockForKey(backend.secretLocks, secretID)
 }
 
-func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string, ttl int) (*secretStorageEntry, error) {
+func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string) (*secretStorageEntry, error) {
 	// create an UUID for the secret
 	secretID, _ := uuid.NewUUID()
 
@@ -32,7 +31,7 @@ func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string, 
 	}
 	if entry != nil {
 		// we already have an entry, make a new one
-		newEntry, err := backend.createSecret(storage, roleID, ttl)
+		newEntry, err := backend.createSecret(storage, roleID)
 		return newEntry, err
 	}
 
@@ -42,11 +41,10 @@ func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string, 
 	salt, err := backend.Salt()
 	key := salt.GetHMAC(secretKey.String())
 	secretEntry := secretStorageEntry{
-		ID:             secretID.String(),
-		Key:            key,
-		RoleID:         roleID,
-		CreationTime:   now,
-		ExpirationTime: now.Add(time.Duration(ttl) * time.Second),
+		ID:           secretID.String(),
+		Key:          key,
+		RoleID:       roleID,
+		CreationTime: now,
 	}
 
 	if err := backend.setSecretEntry(storage, &secretEntry); err != nil {
@@ -71,18 +69,13 @@ func (backend *JwtBackend) readSecret(storage logical.Storage, roleID string, se
 	if err != nil {
 		return nil, err
 	}
-	isValid := time.Now().UTC().Before(secretEntry.ExpirationTime.UTC())
-	if isValid {
-		// secret is still valid, return it
-		return secretEntry, nil
-	}
 
-	// the secret has expired, return nil
-	return nil, nil
+	// secret is still valid, return it
+	return secretEntry, nil
 }
 
 // rotateSecret will reset the role ID secret and expiration time
-func (backend *JwtBackend) rotateSecret(storage logical.Storage, roleID string, secretID string, ttl int) (*secretStorageEntry, error) {
+func (backend *JwtBackend) rotateSecret(storage logical.Storage, roleID string, secretID string) (*secretStorageEntry, error) {
 	if roleID == "" {
 		return nil, fmt.Errorf("Secrets Role ID is not specified")
 	}
@@ -102,7 +95,6 @@ func (backend *JwtBackend) rotateSecret(storage logical.Storage, roleID string, 
 
 	secretEntry.Key = key
 	secretEntry.CreationTime = time.Now().UTC()
-	secretEntry.ExpirationTime = time.Now().UTC().Add(time.Duration(ttl) * time.Second)
 
 	if err := backend.setSecretEntry(storage, secretEntry); err != nil {
 		return nil, err

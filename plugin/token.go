@@ -28,13 +28,6 @@ type TokenCreateEntry struct {
 func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
 	claims := jws.Claims{}
 
-	if roleEntry.AllowCustomClaims {
-		// merge the custom claims onto the role claims
-		for k, v := range createEntry.Claims {
-			roleEntry.Claims[k] = v
-		}
-	}
-
 	for k, v := range roleEntry.Claims {
 		claims.Set(k, v)
 	}
@@ -42,20 +35,23 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	claims.SetExpiration(time.Now().UTC().Add(time.Duration(createEntry.TTL) * time.Second))
 
 	token := jws.NewJWT(claims, crypto.SigningMethodHS256)
+	token.Claims().Set("roleName", roleEntry.Name)
 
 	// read the secret for this role
 	secret, err := backend.readSecret(storage, roleEntry.RoleID, roleEntry.SecretID)
 	if err != nil {
 		return nil, err
 	} else if secret == nil {
-		secret, err = backend.rotateSecret(storage, roleEntry.RoleID, roleEntry.SecretID, roleEntry.SecretTTL)
+		secret, err = backend.rotateSecret(storage, roleEntry.RoleID, roleEntry.SecretID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	serializedToken, _ := token.Serialize([]byte(secret.Key))
-	tokenOutput := map[string]interface{}{"ClientToken": string(serializedToken[:])}
+	tokenOutput := map[string]interface{}{
+		"ClientToken": string(serializedToken[:]),
+	}
 
 	return tokenOutput, nil
 }
