@@ -19,20 +19,14 @@ type RoleStorageEntry struct {
 
 	HMAC string `json:"hmac" structs:"hmac" mapstructure:"hmac"`
 
-	// The TTL for your secret
-	SecretTTL int `json:"secret_ttl" structs:"secret_ttl" mapstructure:"secret_ttl"`
+	// The TTL for your token
+	TokenTTL int `json:"token_ttl" structs:"token_ttl" mapstructure:"token_ttl"`
 
 	// The type of token to be created for the role
 	TokenType string `json:"token_type" structs:"token_type" mapstructure:"token_type"`
 
 	// The provided name for the role
 	Name string `json:"name" structs:"name" mapstructure:"name"`
-
-	// check if the role is allowed to provide their own claims when requesting a token
-	AllowCustomClaims bool `json:"allow_custom_claims" structs:"allow_custom_claims" mapstructure:"allow_custom_claims"`
-
-	// check if the role is allowed to provide their own payloads when requesting a token
-	AllowCustomPayload bool `json:"allow_custom_payload" structs:"allow_custom_payload" mapstructure:"allow_custom_payload"`
 
 	// the default claims that will be appended to the role tokens
 	Claims map[string]string `json:"claims" structs:"claims" mapstructure:"claims"`

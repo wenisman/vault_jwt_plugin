@@ -18,9 +18,9 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The name of the role to be created",
 	},
-	"secret_ttl": {
+	"token_ttl": {
 		Type:        framework.TypeDurationSecond,
-		Description: "The TTL of the secret",
+		Description: "The TTL of the token",
 		Default:     600,
 	},
 	"token_type": {
@@ -111,7 +111,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	storageEntry.HMAC = salt.GetHMAC(storageEntry.RoleID)
 
 	// create the secret
-	secretEntry, err := backend.createSecret(req.Storage, storageEntry.RoleID, storageEntry.SecretTTL)
+	secretEntry, err := backend.createSecret(req.Storage, storageEntry.RoleID)
 	storageEntry.SecretID = secretEntry.ID
 
 	if err := backend.setRoleEntry(req.Storage, storageEntry); err != nil {
@@ -137,6 +137,7 @@ func pathRole(backend *JwtBackend) []*framework.Path {
 			Fields:  fieldSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
+				logical.UpdateOperation: backend.createRole,
 				logical.ReadOperation:   backend.readRole,
 				logical.DeleteOperation: backend.removeRole,
 			},
