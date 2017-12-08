@@ -7,7 +7,7 @@ import (
 )
 
 // generic method to save the tiem to the storage at the defined path
-func (backend *JwtBackend) storageSetItema(storage logical.Storage, path string, item interface{}) error {
+func (backend *JwtBackend) storageSetItem(storage logical.Storage, path string, item interface{}) error {
 	entry, err := logical.StorageEntryJSON(path, item)
 	if err != nil {
 		return fmt.Errorf("Error converting entry to JSON: %#v", err)

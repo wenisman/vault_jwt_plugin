@@ -32,10 +32,11 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 		claims.Set(k, v)
 	}
 
-	claims.SetExpiration(time.Now().UTC().Add(time.Duration(createEntry.TTL) * time.Second))
+	utc := time.Now().Add(time.Duration(createEntry.TTL) * time.Second).UTC()
+	claims.SetExpiration(utc)
 
 	token := jws.NewJWT(claims, crypto.SigningMethodHS256)
-	token.Claims().Set("roleName", roleEntry.Name)
+	token.Claims().Set("role-name", roleEntry.Name)
 
 	// read the secret for this role
 	secret, err := backend.readSecret(storage, roleEntry.RoleID, roleEntry.SecretID)

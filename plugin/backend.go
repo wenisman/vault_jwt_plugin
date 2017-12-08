@@ -74,6 +74,11 @@ func (backend *JwtBackend) invalidate(key string) {
 	}
 }
 
+func (backend *JwtBackend) pathAuthRenew(req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	// TODO
+	return nil, nil
+}
+
 // Backend export the function to create backend and configure
 func Backend(conf *logical.BackendConfig) *JwtBackend {
 	backend := &JwtBackend{
@@ -85,11 +90,17 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 
 	backend.Backend = &framework.Backend{
 		BackendType: logical.TypeCredential,
-		Invalidate:  backend.invalidate,
+		//BackendType: logical.TypeLogical,
+		AuthRenew: backend.pathAuthRenew,
+		PathsSpecial: &logical.Paths{
+			Unauthenticated: []string{"login/*"},
+		},
+		Invalidate: backend.invalidate,
 		Paths: framework.PathAppend(
 			pathToken(backend),
 			pathKeys(backend),
 			pathRole(backend),
+			pathLogin(backend),
 		),
 	}
 
