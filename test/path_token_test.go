@@ -12,13 +12,13 @@ import (
 func TestCreateBadAuthToken(t *testing.T) {
 	b, storage := getTestBackend(t)
 	roleName := "test_role"
-	resp, _ := createSampleRole(b, storage, roleName)
+	resp, _ := createSampleRole(b, storage, roleName, "")
 
 	req := &logical.Request{
 		Storage: storage,
 	}
 
-	resp, err := createToken(req, b, t, roleName)
+	resp, err := createToken(req, b, t, roleName, "")
 	if err != nil && resp.IsError() != false {
 		t.Fatalf("this should not have thrown an error")
 	}
@@ -27,14 +27,14 @@ func TestCreateBadAuthToken(t *testing.T) {
 func TestIssueValidateToken(t *testing.T) {
 	b, storage := getTestBackend(t)
 	roleName := "test_role"
-	resp, _ := createSampleRole(b, storage, roleName)
+	resp, _ := createSampleRole(b, storage, roleName, "")
 
 	req := &logical.Request{
 		Storage:     storage,
 		DisplayName: fmt.Sprintf("test-%s", roleName),
 	}
 
-	resp, err := createToken(req, b, t, roleName)
+	resp, err := createToken(req, b, t, roleName, "")
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -60,7 +60,7 @@ func TestIssueValidateToken(t *testing.T) {
 	validateToken(req, b, t, clientToken, roleName, false)
 
 	// now to recreate a token and test its valid once again
-	resp, err = createToken(req, b, t, roleName)
+	resp, err = createToken(req, b, t, roleName, "")
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -73,11 +73,55 @@ func TestIssueValidateToken(t *testing.T) {
 	validateToken(req, b, t, clientToken, roleName, true)
 }
 
+// test the claims
+func TestIssueClaimsOnToken(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	claims := map[string]string{
+		"sample-one": "allow sample",
+	}
+
+	resp, err := createClaim(b, storage, "test-claim", claims)
+
+	if err != nil {
+		t.Fatal("Unable to save the claims to storage\n")
+	}
+
+	if resp.Data["saved"] != true {
+		t.Fatal("Unable to save the claims to storage\n")
+	}
+
+	roleName := "test_claim_role"
+	resp, _ = createSampleRole(b, storage, roleName, "")
+
+	req := &logical.Request{
+		Storage:     storage,
+		DisplayName: fmt.Sprintf("test-claim-%s", roleName),
+	}
+
+	resp, err = createToken(req, b, t, roleName, "test-claim")
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp.Data["ClientToken"] == "" {
+		t.Fatal("no token returned\n")
+	}
+
+	clientToken := resp.Data["ClientToken"].(string)
+	log.Println(clientToken)
+
+}
+
 // create the token given the parameters
-func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
+func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string, claimName string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"role_name":  roleName,
 		"token_type": "jwt",
+	}
+
+	if claimName != "" {
+		data["clain_name"] = claimName
 	}
 
 	req.Operation = logical.UpdateOperation
@@ -119,7 +163,7 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 }
 
 // create the role with the specified name
-func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
+func createSampleRole(b logical.Backend, storage logical.Storage, roleName string, claim string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"token_type": "jwt",
 		"token_ttl":  2,
@@ -128,6 +172,23 @@ func createSampleRole(b logical.Backend, storage logical.Storage, roleName strin
 	req := &logical.Request{
 		Operation: logical.CreateOperation,
 		Path:      fmt.Sprintf("role/%s", roleName),
+		Storage:   storage,
+		Data:      data,
+	}
+
+	return b.HandleRequest(req)
+}
+
+func createClaim(b logical.Backend, storage logical.Storage, name string, claims map[string]string) (*logical.Response, error) {
+
+	data := map[string]interface{}{
+		"claims": claims,
+		"name":   name,
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "token/claims",
 		Storage:   storage,
 		Data:      data,
 	}
