@@ -8,12 +8,13 @@ import (
 	"github.com/hashicorp/vault/logical/framework"
 )
 
+// Login for the role using a pre-assigned password.
 func (backend *JwtBackend) authLoginLocal(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	roleName := data.Get("role-name").(string)
 	password := data.Get("password").(string)
 
-	// TODO : read role and validate the password.
+	// read role and validate the password.
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Error Retrieving role '%s'", roleName)), nil
@@ -38,9 +39,9 @@ func (backend *JwtBackend) authLoginLocal(req *logical.Request, data *framework.
 				"auth_type": "local",
 			},
 			InternalData: map[string]interface{}{
-				"role_name": "foo",
+				"role_name": roleName,
 			},
-			Policies: []string{"jwt"},
+			Policies: roleEntry.Policies,
 			LeaseOptions: logical.LeaseOptions{
 				TTL:       ttl,
 				Renewable: true,

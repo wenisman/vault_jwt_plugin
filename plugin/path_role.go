@@ -26,6 +26,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	"token_type": {
 		Type:        framework.TypeString,
 		Description: "The type of token to be associated to the role [jws|jwt]",
+		Default:     "jwt",
+	},
+	"policies": {
+		Type:        framework.TypeStringSlice,
+		Description: "The list of policies to assign to the role",
 	},
 	"claims": {
 		Type:        framework.TypeMap,
@@ -104,7 +109,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	var secretEntry *secretStorageEntry
 	salt, _ := backend.Salt()
 
-	if role != nil {
+	if role == nil {
 		// set the role ID
 		role = new(RoleStorageEntry)
 		roleID, _ := uuid.NewUUID()
@@ -119,10 +124,23 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 
 		role.SecretID = secretEntry.ID
 	} else {
+		// update the role
 		secretEntry, err = backend.getSecretEntry(req.Storage, role.RoleID, role.SecretID)
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve secret entry %#v", err)), nil
 		}
+	}
+
+	tokenType := data.Get("token_type")
+	if tokenType == "" {
+		// make jwt the default
+		tokenType = "jwt"
+	}
+
+	policies := data.Get("policies").([]string)
+	if policies != nil {
+		// set the policies if they are provided
+		role.Policies = policies
 	}
 
 	// if the user has a password we get the hmac and then save it

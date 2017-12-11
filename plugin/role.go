@@ -17,6 +17,9 @@ type RoleStorageEntry struct {
 	// The unique identifier pointing to the secret for the role
 	SecretID string `json:"secret_id" structs:"secret_id" mapstructure:"secret_id"`
 
+	// Policies - the list of policies to apply to the auth
+	Policies []string `json:"policies" structs:"policies" mapstructure:"policies"`
+
 	HMAC string `json:"hmac" structs:"hmac" mapstructure:"hmac"`
 
 	// The TTL for your token
