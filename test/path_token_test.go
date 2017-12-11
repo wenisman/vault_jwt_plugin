@@ -30,7 +30,8 @@ func TestIssueValidateToken(t *testing.T) {
 	resp, _ := createSampleRole(b, storage, roleName)
 
 	req := &logical.Request{
-		Storage: storage,
+		Storage:     storage,
+		DisplayName: fmt.Sprintf("test-%s", roleName),
 	}
 
 	resp, err := createToken(req, b, t, roleName)
@@ -72,13 +73,14 @@ func TestIssueValidateToken(t *testing.T) {
 	validateToken(req, b, t, clientToken, roleName, true)
 }
 
+// create the token given the parameters
 func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"role_name":  roleName,
 		"token_type": "jwt",
 	}
 
-	req.Operation = logical.ReadOperation
+	req.Operation = logical.UpdateOperation
 	req.Path = "token/issue"
 	req.Data = data
 
@@ -89,6 +91,7 @@ func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName
 	return resp, err
 }
 
+// validate the returned token
 func validateToken(req *logical.Request, b logical.Backend, t *testing.T, clientToken string, roleName string, result bool) {
 	data := map[string]interface{}{
 		"token":     clientToken,
@@ -115,6 +118,7 @@ func validateToken(req *logical.Request, b logical.Backend, t *testing.T, client
 	}
 }
 
+// create the role with the specified name
 func createSampleRole(b logical.Backend, storage logical.Storage, roleName string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"token_type": "jwt",

@@ -38,7 +38,7 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	},
 	"allow_custom_claims": {
 		Type:        framework.TypeBool,
-		Description: "Define if a custom ste of claims can be provided during the creation of the token",
+		Description: "Define if a custom set of claims can be provided during the creation of the token",
 		Default:     false,
 	},
 	"allow_custom_payload": {

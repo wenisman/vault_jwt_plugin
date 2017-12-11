@@ -33,6 +33,9 @@ type RoleStorageEntry struct {
 
 	// the default claims that will be appended to the role tokens
 	Claims map[string]string `json:"claims" structs:"claims" mapstructure:"claims"`
+
+	// The set of named claims that this role is allowed to use
+	NamedClaims []string `json:"named_claims" structs:"named_claims" mapstructure:"named_claims"`
 }
 
 // get or create the basic lock for the role name
