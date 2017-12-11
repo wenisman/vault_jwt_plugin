@@ -226,3 +226,20 @@ func createClaim(b logical.Backend, storage logical.Storage, name string, claims
 
 	return b.HandleRequest(req)
 }
+
+func createClaim(b logical.Backend, storage logical.Storage, name string, claims map[string]string) (*logical.Response, error) {
+
+	data := map[string]interface{}{
+		"claims": claims,
+		"name":   name,
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "token/claims",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	return b.HandleRequest(req)
+}
