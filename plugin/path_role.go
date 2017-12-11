@@ -166,15 +166,10 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 
 // set up the paths for the roles within vault
 func pathRole(backend *JwtBackend) []*framework.Path {
-	fieldSchema := map[string]*framework.FieldSchema{}
-	for k, v := range createRoleSchema {
-		fieldSchema[k] = v
-	}
-
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern: fmt.Sprintf("role/%s", framework.GenericNameRegex("name")),
-			Fields:  fieldSchema,
+			Fields:  createRoleSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
 				logical.UpdateOperation: backend.createRole,

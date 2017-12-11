@@ -80,15 +80,10 @@ func (backend *JwtBackend) readKey(req *logical.Request, data *framework.FieldDa
 
 // set up the paths for the roles within vault
 func pathKeys(backend *JwtBackend) []*framework.Path {
-	fieldSchema := map[string]*framework.FieldSchema{}
-	for k, v := range createKeySchema {
-		fieldSchema[k] = v
-	}
-
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern: fmt.Sprintf("keys/%s", framework.GenericNameRegex("name")),
-			Fields:  fieldSchema,
+			Fields:  createKeySchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createUpdateKey,
 				logical.UpdateOperation: backend.createUpdateKey,

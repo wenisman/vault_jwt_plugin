@@ -8,6 +8,20 @@ import (
 	"github.com/hashicorp/vault/logical/framework"
 )
 
+// schema for people to login locally
+var loginSchema = map[string]*framework.FieldSchema{
+	"role-name": {
+		Type:        framework.TypeString,
+		Description: "The name of the role to login",
+		Default:     "",
+	},
+	"password": {
+		Type:        framework.TypeString,
+		Description: "The type of token to be associated to the role [jws|jwt]",
+		Default:     "",
+	},
+}
+
 // Login for the role using a pre-assigned password.
 func (backend *JwtBackend) authLoginLocal(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
@@ -53,15 +67,10 @@ func (backend *JwtBackend) authLoginLocal(req *logical.Request, data *framework.
 
 // set up the paths for the roles within vault
 func pathLogin(backend *JwtBackend) []*framework.Path {
-	fieldSchema := map[string]*framework.FieldSchema{}
-	for k, v := range createRoleSchema {
-		fieldSchema[k] = v
-	}
-
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern: "login/local",
-			Fields:  fieldSchema,
+			Fields:  loginSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.UpdateOperation: backend.authLoginLocal,
 			},
