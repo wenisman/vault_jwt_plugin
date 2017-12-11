@@ -18,14 +18,9 @@ func TestCreateBadAuthToken(t *testing.T) {
 		Storage: storage,
 	}
 
-	// this should not be allowed as the hmac should fail
-	resp, err := createToken(req, b, t, roleName, "abc")
-	if err == nil && resp.IsError() != true {
-		t.Fatalf("this should have thrown an error")
-	}
-
-	if resp.Data["error"] != "unauthorized access" {
-		t.Fatalf("unautorized access not detected")
+	resp, err := createToken(req, b, t, roleName)
+	if err != nil && resp.IsError() != false {
+		t.Fatalf("this should not have thrown an error")
 	}
 }
 
@@ -34,12 +29,11 @@ func TestIssueValidateToken(t *testing.T) {
 	roleName := "test_role"
 	resp, _ := createSampleRole(b, storage, roleName)
 
-	roleID := resp.Data["role_id"].(string)
 	req := &logical.Request{
 		Storage: storage,
 	}
 
-	resp, err := createToken(req, b, t, roleName, roleID)
+	resp, err := createToken(req, b, t, roleName)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -65,7 +59,7 @@ func TestIssueValidateToken(t *testing.T) {
 	validateToken(req, b, t, clientToken, roleName, false)
 
 	// now to recreate a token and test its valid once again
-	resp, err = createToken(req, b, t, roleName, roleID)
+	resp, err = createToken(req, b, t, roleName)
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -78,10 +72,9 @@ func TestIssueValidateToken(t *testing.T) {
 	validateToken(req, b, t, clientToken, roleName, true)
 }
 
-func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string, roleID string) (*logical.Response, error) {
+func createToken(req *logical.Request, b logical.Backend, t *testing.T, roleName string) (*logical.Response, error) {
 	data := map[string]interface{}{
 		"role_name":  roleName,
-		"role_id":    roleID,
 		"token_type": "jwt",
 	}
 

@@ -1,6 +1,10 @@
 package josejwt
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
 	"github.com/hashicorp/vault/logical"
@@ -40,7 +44,7 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "The unique identifier for the role to use in the token",
 	},
-	"ttl": {
+	"token_ttl": {
 		Type:        framework.TypeDurationSecond,
 		Description: "The duration in seconds after which the token will expire",
 		Default:     600, // default of 10 minutes
@@ -58,7 +62,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 
 	roleName := data.Get("role_name").(string)
 	if roleName == "" {
-		roleName = token.Claims().Get("roleName").(string)
+		roleName = token.Claims().Get("role-name").(string)
 	}
 
 	role, err := backend.getRoleEntry(req.Storage, roleName)
@@ -77,10 +81,9 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		return &logical.Response{Data: validation}, nil
 	}
 
-	//err = token.Verify([]byte(secret.Key), crypto.SigningMethodHS256)
 	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
-		return logical.ErrorResponse("Invalid Token"), err
+		return logical.ErrorResponse(fmt.Sprintf("Invalid Token %#v \n secret:%s \n role:%s", err, secret.Key, roleName)), err
 	}
 
 	validation := map[string]interface{}{
@@ -89,19 +92,67 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 	return &logical.Response{Data: validation}, nil
 }
 
-// create the basic jwt token with an expiry wihtin the claim
+// refresh the provided token so that it can live on...
+func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	byteToken := []byte(data.Get("token").(string))
+	token, err := jws.ParseJWT(byteToken)
+
+	if err != nil {
+		return logical.ErrorResponse("unable to parse token"), err
+	}
+
+	roleName := data.Get("role_name").(string)
+	if roleName == "" {
+		roleName = token.Claims().Get("role-name").(string)
+	}
+
+	role, err := backend.getRoleEntry(req.Storage, roleName)
+	if err != nil {
+		return logical.ErrorResponse("unable to retrieve role details"), err
+	}
+
+	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
+	if err != nil {
+		return logical.ErrorResponse("Invalid Token"), err
+	}
+
+	expiry := time.Now().Add(time.Duration(role.TokenTTL) * time.Second).UTC()
+	token.Claims().SetExpiration(expiry)
+
+	tokenData, _ := token.Serialize([]byte(secret.Key))
+	tokenOutput := map[string]interface{}{
+		"ClientToken": string(tokenData[:]),
+	}
+
+	return &logical.Response{Data: tokenOutput}, nil
+}
+
+func getRoleName(displayName string) string {
+	index := strings.Index(displayName, "-")
+	if index != -1 {
+		return displayName[index+1:]
+	}
+
+	return displayName
+}
+
+// create the basic jwt token with an expiry within the claim
 func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role_name").(string)
-	roleID := data.Get("role_id").(string)
+	if roleName == "" {
+		// use the IAM role if no other role is provided.
+		roleName = getRoleName(req.DisplayName)
+	}
 
 	// get the role by name
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
-		return logical.ErrorResponse("Role note recognised"), nil
+		return logical.ErrorResponse(fmt.Sprintf("Role name '%s' not recognised", roleName)), nil
 	}
 
 	salt, _ := backend.Salt()
-	hmac := salt.GetHMAC(roleID)
+	hmac := salt.GetHMAC(roleEntry.RoleID)
 
 	if hmac != roleEntry.HMAC {
 		return logical.ErrorResponse("unauthorized access"), nil
@@ -109,41 +160,39 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 
 	var tokenEntry TokenCreateEntry
 	if err := mapstructure.Decode(data.Raw, &tokenEntry); err != nil {
-		return logical.ErrorResponse("Error decoding role"), err
+		return logical.ErrorResponse("Error decoding token"), err
 	}
-	tokenEntry.TTL = roleEntry.TokenTTL
+
+	if roleEntry.TokenTTL == 0 {
+		// TODO : read this from the config
+		tokenEntry.TTL = 600
+	} else {
+		tokenEntry.TTL = roleEntry.TokenTTL
+	}
+	tokenEntry.TokenType = roleEntry.TokenType
 
 	token, err := backend.createTokenEntry(req.Storage, tokenEntry, roleEntry)
 	if err != nil {
-		return logical.ErrorResponse("Error creating token"), err
+		return logical.ErrorResponse(fmt.Sprintf("Error creating token, %#v", err)), err
 	}
 
 	return &logical.Response{Data: token}, nil
 }
 
 func pathToken(backend *JwtBackend) []*framework.Path {
-	tokenSchema := map[string]*framework.FieldSchema{}
-	for k, v := range createTokenSchema {
-		tokenSchema[k] = v
-	}
-
-	for k, v := range validateTokenSchema {
-		tokenSchema[k] = v
-	}
-
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern: "token/issue",
-			Fields:  tokenSchema,
+			Fields:  createTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.ReadOperation: backend.createToken,
+				logical.UpdateOperation: backend.createToken,
 			},
 		},
 		&framework.Path{
 			Pattern: "token/validate",
-			Fields:  tokenSchema,
+			Fields:  validateTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.ReadOperation: backend.validateToken,
+				logical.UpdateOperation: backend.validateToken,
 			},
 		},
 	}

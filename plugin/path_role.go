@@ -26,6 +26,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	"token_type": {
 		Type:        framework.TypeString,
 		Description: "The type of token to be associated to the role [jws|jwt]",
+		Default:     "jwt",
+	},
+	"policies": {
+		Type:        framework.TypeStringSlice,
+		Description: "The list of policies to assign to the role",
 	},
 	"claims": {
 		Type:        framework.TypeMap,
@@ -40,6 +45,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 		Type:        framework.TypeBool,
 		Description: "Define if a custom payload can be provided during the creation of the token",
 		Default:     false,
+	},
+	"password": {
+		Type:        framework.TypeString,
+		Description: "The type of token to be associated to the role [jws|jwt]",
+		Default:     "",
 	},
 }
 
@@ -90,51 +100,76 @@ func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldD
 // to be able to create tokens down the line
 func (backend *JwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
+
 	role, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("Error reading role"), err
 	}
 
-	if role != nil {
-		return logical.ErrorResponse(fmt.Sprintf("role with name '%s' already exists", roleName)), nil
+	var secretEntry *secretStorageEntry
+	salt, _ := backend.Salt()
+
+	if role == nil {
+		// set the role ID
+		role = new(RoleStorageEntry)
+		roleID, _ := uuid.NewUUID()
+		role.RoleID = roleID.String()
+		role.HMAC = salt.GetHMAC(role.RoleID)
+
+		// create the secret
+		secretEntry, err = backend.createSecret(req.Storage, role.RoleID)
+		if err != nil {
+			return logical.ErrorResponse(fmt.Sprintf("Unable to create secret entry %#v", err)), nil
+		}
+
+		role.SecretID = secretEntry.ID
+	} else {
+		// update the role
+		secretEntry, err = backend.getSecretEntry(req.Storage, role.RoleID, role.SecretID)
+		if err != nil {
+			return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve secret entry %#v", err)), nil
+		}
 	}
 
-	var storageEntry RoleStorageEntry
-	if err := mapstructure.Decode(data.Raw, &storageEntry); err != nil {
+	tokenType := data.Get("token_type")
+	if tokenType == "" {
+		// make jwt the default
+		tokenType = "jwt"
+	}
+
+	policies := data.Get("policies").([]string)
+	if policies != nil {
+		// set the policies if they are provided
+		role.Policies = policies
+	}
+
+	// if the user has a password we get the hmac and then save it
+	password := data.Get("password").(string)
+	if password != "" {
+		secretEntry.Password = salt.GetHMAC(password)
+		backend.setSecretEntry(req.Storage, secretEntry)
+	}
+
+	if err := mapstructure.Decode(data.Raw, &role); err != nil {
 		return logical.ErrorResponse("Error decoding role"), err
 	}
 
-	// set the role ID
-	roleID, _ := uuid.NewUUID()
-	storageEntry.RoleID = roleID.String()
-	salt, _ := backend.Salt()
-	storageEntry.HMAC = salt.GetHMAC(storageEntry.RoleID)
-
-	// create the secret
-	secretEntry, err := backend.createSecret(req.Storage, storageEntry.RoleID)
-	storageEntry.SecretID = secretEntry.ID
-
-	if err := backend.setRoleEntry(req.Storage, storageEntry); err != nil {
+	if err := backend.setRoleEntry(req.Storage, *role); err != nil {
 		return logical.ErrorResponse("Error saving role"), err
 	}
 
 	roleDetails := map[string]interface{}{
-		"role_id": storageEntry.RoleID,
+		"role_id": role.RoleID,
 	}
 	return &logical.Response{Data: roleDetails}, nil
 }
 
 // set up the paths for the roles within vault
 func pathRole(backend *JwtBackend) []*framework.Path {
-	fieldSchema := map[string]*framework.FieldSchema{}
-	for k, v := range createRoleSchema {
-		fieldSchema[k] = v
-	}
-
 	paths := []*framework.Path{
 		&framework.Path{
 			Pattern: fmt.Sprintf("role/%s", framework.GenericNameRegex("name")),
-			Fields:  fieldSchema,
+			Fields:  createRoleSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.CreateOperation: backend.createRole,
 				logical.UpdateOperation: backend.createRole,

@@ -13,6 +13,7 @@ type secretStorageEntry struct {
 	ID           string    `json:"id" structs:"id" mapstructure:"id"`
 	Key          string    `json:"Key" structs:"Key" mapstructure:"Key"`
 	RoleID       string    `json:"role_id" structs:"role_id" mapstructure:"role_id"`
+	Password     string    `json:"password" structs:"password" mapstructure:"password"`
 	CreationTime time.Time `json:"creation_time" structs:"creation_time" mapstructure:"creation_time"`
 }
 
