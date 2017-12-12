@@ -231,12 +231,11 @@ func createClaim(b logical.Backend, storage logical.Storage, name string, claims
 
 	data := map[string]interface{}{
 		"claims": claims,
-		"name":   name,
 	}
 
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
-		Path:      "token/claims",
+		Path:      fmt.Sprintf("claims/%s", name),
 		Storage:   storage,
 		Data:      data,
 	}

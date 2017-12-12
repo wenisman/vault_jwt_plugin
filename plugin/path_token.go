@@ -208,13 +208,6 @@ func pathToken(backend *JwtBackend) []*framework.Path {
 				logical.UpdateOperation: backend.validateToken,
 			},
 		},
-		&framework.Path{
-			Pattern: "token/claims",
-			Fields:  createClaimSchema,
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.UpdateOperation: backend.createUpdateTokenClaims,
-			},
-		},
 	}
 
 	return paths
