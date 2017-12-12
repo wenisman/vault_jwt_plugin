@@ -20,6 +20,7 @@ type RoleStorageEntry struct {
 	// Policies - the list of policies to apply to the auth
 	Policies []string `json:"policies" structs:"policies" mapstructure:"policies"`
 
+	// The saved HMAC ID of this role, this is whats referenced internally
 	HMAC string `json:"hmac" structs:"hmac" mapstructure:"hmac"`
 
 	// The TTL for your token

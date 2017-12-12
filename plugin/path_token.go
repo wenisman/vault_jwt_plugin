@@ -55,17 +55,6 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 	},
 }
 
-var createClaimSchema = map[string]*framework.FieldSchema{
-	"claims": {
-		Type:        framework.TypeCommaStringSlice,
-		Description: "The claims to be put onto the token",
-	},
-	"name": {
-		Type:        framework.TypeString,
-		Description: "The human readable name of the claims",
-	},
-}
-
 // Provides basic token validation for a provided jwt token
 func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	byteToken := []byte(data.Get("token").(string))
@@ -170,14 +159,14 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 
 	// get the role by name
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
-	if err != nil {
+	if roleEntry == nil || err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Role name '%s' not recognised", roleName)), nil
 	}
 
 	claimName := data.Get("claim_name").(string)
 	if claimName != "" {
 		// test if the role can use this claim
-		if contains(roleEntry.NamedClaims, claimName) == false {
+		if len(roleEntry.NamedClaims) == 0 || contains(roleEntry.NamedClaims, claimName) == false {
 			return logical.ErrorResponse(fmt.Sprintf("Permission denied on claim '%s'", claimName)), nil
 		}
 	}
@@ -203,28 +192,6 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	return &logical.Response{Data: token}, nil
 }
 
-// create or update the token claims
-func (backend *JwtBackend) createUpdateTokenClaims(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	claims := TokenClaims{
-		Claims: data.Get("claims").(map[string]string),
-	}
-
-	name := data.Get("name").(string)
-	if name == "" {
-		return logical.ErrorResponse("Claim name not provided"), nil
-	}
-
-	if err := setTokenClaims(backend, req.Storage, name, claims); err != nil {
-		return logical.ErrorResponse("Unable to save token claims"), err
-	}
-
-	output := map[string]interface{}{
-		"saved": true,
-	}
-
-	return &logical.Response{Data: output}, nil
-}
-
 func pathToken(backend *JwtBackend) []*framework.Path {
 	paths := []*framework.Path{
 		&framework.Path{
@@ -239,13 +206,6 @@ func pathToken(backend *JwtBackend) []*framework.Path {
 			Fields:  validateTokenSchema,
 			Callbacks: map[logical.Operation]framework.OperationFunc{
 				logical.UpdateOperation: backend.validateToken,
-			},
-		},
-		&framework.Path{
-			Pattern: "token/claims",
-			Fields:  createClaimSchema,
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.UpdateOperation: backend.createUpdateTokenClaims,
 			},
 		},
 	}
