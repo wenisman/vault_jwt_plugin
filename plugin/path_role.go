@@ -30,7 +30,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	},
 	"policies": {
 		Type:        framework.TypeStringSlice,
-		Description: "The list of policies to assign to the role",
+		Description: "The list of vault policies to assign to the role",
+	},
+	"named_claims": {
+		Type:        framework.TypeStringSlice,
+		Description: "The list of named claims to allow onthis role",
 	},
 	"claims": {
 		Type:        framework.TypeMap,
@@ -38,7 +42,7 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	},
 	"allow_custom_claims": {
 		Type:        framework.TypeBool,
-		Description: "Define if a custom ste of claims can be provided during the creation of the token",
+		Description: "Define if a custom set of claims can be provided during the creation of the token",
 		Default:     false,
 	},
 	"allow_custom_payload": {
@@ -100,6 +104,9 @@ func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldD
 // to be able to create tokens down the line
 func (backend *JwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
+	if roleName == "" {
+		return logical.ErrorResponse("Role name not supplied"), nil
+	}
 
 	role, err := backend.getRoleEntry(req.Storage, roleName)
 	if err != nil {
@@ -110,8 +117,13 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	salt, _ := backend.Salt()
 
 	if role == nil {
-		// set the role ID
 		role = new(RoleStorageEntry)
+		// creating a new role
+		if err := mapstructure.Decode(data.Raw, &role); err != nil {
+			return logical.ErrorResponse("creating role - Error decoding role"), err
+		}
+
+		// set the role ID
 		roleID, _ := uuid.NewUUID()
 		role.RoleID = roleID.String()
 		role.HMAC = salt.GetHMAC(role.RoleID)
@@ -129,18 +141,17 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve secret entry %#v", err)), nil
 		}
-	}
 
-	tokenType := data.Get("token_type")
-	if tokenType == "" {
-		// make jwt the default
-		tokenType = "jwt"
-	}
+		policies := data.Get("policies").([]string)
+		if len(policies) > 0 {
+			// set the policies if they are provided
+			role.Policies = policies
+		}
 
-	policies := data.Get("policies").([]string)
-	if policies != nil {
-		// set the policies if they are provided
-		role.Policies = policies
+		namedClaims := data.Get("named_claims").([]string)
+		if len(namedClaims) > 0 {
+			role.NamedClaims = namedClaims
+		}
 	}
 
 	// if the user has a password we get the hmac and then save it
@@ -148,10 +159,6 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	if password != "" {
 		secretEntry.Password = salt.GetHMAC(password)
 		backend.setSecretEntry(req.Storage, secretEntry)
-	}
-
-	if err := mapstructure.Decode(data.Raw, &role); err != nil {
-		return logical.ErrorResponse("Error decoding role"), err
 	}
 
 	if err := backend.setRoleEntry(req.Storage, *role); err != nil {

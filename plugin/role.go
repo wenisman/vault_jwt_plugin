@@ -20,6 +20,7 @@ type RoleStorageEntry struct {
 	// Policies - the list of policies to apply to the auth
 	Policies []string `json:"policies" structs:"policies" mapstructure:"policies"`
 
+	// The saved HMAC ID of this role, this is whats referenced internally
 	HMAC string `json:"hmac" structs:"hmac" mapstructure:"hmac"`
 
 	// The TTL for your token
@@ -33,6 +34,9 @@ type RoleStorageEntry struct {
 
 	// the default claims that will be appended to the role tokens
 	Claims map[string]string `json:"claims" structs:"claims" mapstructure:"claims"`
+
+	// The set of named claims that this role is allowed to use
+	NamedClaims []string `json:"named_claims" structs:"named_claims" mapstructure:"named_claims"`
 }
 
 // get or create the basic lock for the role name

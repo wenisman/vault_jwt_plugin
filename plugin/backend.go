@@ -29,6 +29,7 @@ type JwtBackend struct {
 	roleLocks   []*locksutil.LockEntry
 	secretLocks []*locksutil.LockEntry
 	keyLocks    []*locksutil.LockEntry
+	claimLocks  []*locksutil.LockEntry
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -86,12 +87,12 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 		roleLocks:   locksutil.CreateLocks(),
 		secretLocks: locksutil.CreateLocks(),
 		keyLocks:    locksutil.CreateLocks(),
+		claimLocks:  locksutil.CreateLocks(),
 	}
 
 	backend.Backend = &framework.Backend{
 		BackendType: logical.TypeCredential,
-		//BackendType: logical.TypeLogical,
-		AuthRenew: backend.pathAuthRenew,
+		AuthRenew:   backend.pathAuthRenew,
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{"login/*"},
 		},
@@ -101,6 +102,7 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 			pathKeys(backend),
 			pathRole(backend),
 			pathLogin(backend),
+			pathClaims(backend),
 		),
 	}
 

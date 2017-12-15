@@ -28,9 +28,13 @@ var validateTokenSchema = map[string]*framework.FieldSchema{
 // basic schema for the creation of the token,
 // this will map the fields coming in from the vault request field map
 var createTokenSchema = map[string]*framework.FieldSchema{
+	"claim_name": {
+		Type:        framework.TypeString,
+		Description: "The name of the ste of claims to use",
+	},
 	"claims": {
 		Type:        framework.TypeCommaStringSlice,
-		Description: "The custom claims that are aplied to the token",
+		Description: "The custom claims that are applied to the token",
 	},
 	"payload": {
 		Type:        framework.TypeCommaStringSlice,
@@ -128,6 +132,7 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 	return &logical.Response{Data: tokenOutput}, nil
 }
 
+// split the display name, taking everything after the first dash '-'
 func getRoleName(displayName string) string {
 	index := strings.Index(displayName, "-")
 	if index != -1 {
@@ -137,25 +142,33 @@ func getRoleName(displayName string) string {
 	return displayName
 }
 
+func contains(array []string, value string) bool {
+	for _, v := range array {
+		if v == value {
+			return true
+		}
+	}
+
+	return false
+}
+
 // create the basic jwt token with an expiry within the claim
 func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("role_name").(string)
-	if roleName == "" {
-		// use the IAM role if no other role is provided.
-		roleName = getRoleName(req.DisplayName)
-	}
+	// use the IAM role from the authentication
+	roleName := getRoleName(req.DisplayName)
 
 	// get the role by name
 	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
-	if err != nil {
+	if roleEntry == nil || err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Role name '%s' not recognised", roleName)), nil
 	}
 
-	salt, _ := backend.Salt()
-	hmac := salt.GetHMAC(roleEntry.RoleID)
-
-	if hmac != roleEntry.HMAC {
-		return logical.ErrorResponse("unauthorized access"), nil
+	claimName := data.Get("claim_name").(string)
+	if claimName != "" {
+		// test if the role can use this claim
+		if len(roleEntry.NamedClaims) == 0 || contains(roleEntry.NamedClaims, claimName) == false {
+			return logical.ErrorResponse(fmt.Sprintf("Permission denied on claim '%s'", claimName)), nil
+		}
 	}
 
 	var tokenEntry TokenCreateEntry
@@ -164,7 +177,7 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	}
 
 	if roleEntry.TokenTTL == 0 {
-		// TODO : read this from the config
+		// no TTL so use the default of 10 minutes
 		tokenEntry.TTL = 600
 	} else {
 		tokenEntry.TTL = roleEntry.TokenTTL

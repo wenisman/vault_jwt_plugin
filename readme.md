@@ -89,6 +89,14 @@ You can refer to the documentation, however to set up a role for the AWS Auth to
 vault write auth/aws/role/[ROLE_NAME] auth_type=iam policies=[default, OTHER POLICIES] bound_iam_principal_arn=“[IAM_ARN]”
 ```
 
+### Claims
+You can create a `named` claim, this is a predefined set of claims that will be attached to a JWT. You can assign any named claim to a Role and when you create the token you can give it this claim as long as the role has this specified during its creations. This is to stop apps from mis-assuming roles.
+
+```
+
+curl -X POST  -H "X-Vault-Token: [VAULT_TOKEN]" -H "Content-Type: application/json" -d '{ "claims": { [ENTER YOUR CLAIMS] }  }' http://127.0.0.1:8200/v1/auth/jwtplugin/claims/[CLAIM_NAME]
+```
+
 ### JWT Roles
 You will also need to set up the roles in the JWT plugin as well, this is so that you can set the claims that are to be provided on the token. 
 
@@ -98,5 +106,8 @@ To set up the role you will need higher level permissions, you can set up your o
 ```
 curl -H "X-Vault-Token: [VAULT-TOKEN]" -H "Content-Type: application/json" --request POST -d '{ "claims": { [ENTER YOUR CLAIMS] }, "token_type": "jwt", "name": "[AWS-ROLE-NAME]" }' http://127.0.0.1:8200/v1/auth/[PLUGIN-NAME]/role/[AWS-ROLE-NAME]
 ```  
-
+**OR** use a named claim
+```
+curl -H "X-Vault-Token: [VAULT-TOKEN]" -H "Content-Type: application/json" --request POST -d '{ "claim-name": "[CLAIM_NAME]", "token_type": "jwt", "name": "[AWS-ROLE-NAME]" }' http://127.0.0.1:8200/v1/auth/[PLUGIN-NAME]/role/[AWS-ROLE-NAME]
+```
 
