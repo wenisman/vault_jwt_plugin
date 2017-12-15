@@ -26,12 +26,15 @@ RUN apk --no-cache add ca-certificates
 RUN mkdir -p /vault/plugins
 
 # set up the AWS Auth backend
+WORKDIR /vault/plugins
+
+RUN /vault/plugins/wait_for_vault.sh
+
 RUN token=$(cat $HOME/.vault-token) && \
     vault auth $token && \
     vault auth-enable aws && \
     vault write auth/aws/config/client secret_key=$AWS_SECRET_KEY access_key=$AWS_ACCESS_KEY
 
-WORKDIR /vault/plugins
 
 COPY --from=builder /go/src/github.com/wenisman/vault_jwt_plugin/build/* .
 
