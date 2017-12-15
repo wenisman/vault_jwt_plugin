@@ -120,7 +120,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		role = new(RoleStorageEntry)
 		// creating a new role
 		if err := mapstructure.Decode(data.Raw, &role); err != nil {
-			return logical.ErrorResponse("Error decoding role"), err
+			return logical.ErrorResponse("creating role - Error decoding role"), err
 		}
 
 		// set the role ID
