@@ -1,8 +1,8 @@
 storage "consul" {
-  address = "127.0.0.1:8500"
+  address = "consul:8500"
   path = "vault"
   token = "consul-vault-token"
-  scheme = "https"
+  scheme = "http"
   service = "vault"
 }
 

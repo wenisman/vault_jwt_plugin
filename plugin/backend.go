@@ -94,7 +94,7 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 		BackendType: logical.TypeCredential,
 		AuthRenew:   backend.pathAuthRenew,
 		PathsSpecial: &logical.Paths{
-			Unauthenticated: []string{"login/*"},
+			Unauthenticated: []string{"login/*", "token/validate"},
 		},
 		Invalidate: backend.invalidate,
 		Paths: framework.PathAppend(

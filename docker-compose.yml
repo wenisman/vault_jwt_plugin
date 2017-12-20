@@ -1,0 +1,29 @@
+version: '3'
+services:
+  consul:
+    image: consul:latest
+    cap_add:
+      - IPC_LOCK
+    ports: 
+      - 8301:8301
+      - 8302:8302
+      - 8500:8500
+      - 8600:8600
+      - 80:80
+    volumes:
+      - consul-data:/consul/data
+    environment:
+      - CONSUL_NAME=""
+      - CONSUL_KEY=""
+  
+  vault:
+    build: .
+    environment:
+      - VAULT_PORT=8201
+    links: 
+      - consul
+    ports:
+      - 8201:8201
+
+volumes:
+  consul-data:  
