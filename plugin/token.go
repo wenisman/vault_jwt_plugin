@@ -57,7 +57,7 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	if err != nil {
 		return nil, err
 	} else if secret == nil {
-		secret, err = backend.rotateSecret(storage, roleEntry.RoleID, roleEntry.SecretID)
+		secret, err = backend.rotateSecret(storage, roleEntry.RoleID, roleEntry.SecretID, roleEntry.TokenTTL)
 		if err != nil {
 			return nil, err
 		}

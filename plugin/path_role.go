@@ -129,7 +129,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		role.HMAC = salt.GetHMAC(role.RoleID)
 
 		// create the secret
-		secretEntry, err = backend.createSecret(req.Storage, role.RoleID)
+		secretEntry, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to create secret entry %#v", err)), nil
 		}

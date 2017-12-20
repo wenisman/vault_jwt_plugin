@@ -116,6 +116,14 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 	}
 
 	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	if secret == nil {
+		// secret has probably expired so we will make a new one
+		secret, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
+	}
+	if err != nil {
+		return logical.ErrorResponse("Unable to regnerate the secret"), err
+	}
+
 	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
 		return logical.ErrorResponse("Invalid Token"), err
@@ -123,6 +131,10 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 
 	expiry := time.Now().Add(time.Duration(role.TokenTTL) * time.Second).UTC()
 	token.Claims().SetExpiration(expiry)
+
+	// make sure we update the expiry on the secret
+	secret.Expiration = expiry
+	backend.setSecretEntry(req.Storage, secret)
 
 	tokenData, _ := token.Serialize([]byte(secret.Key))
 	tokenOutput := map[string]interface{}{
