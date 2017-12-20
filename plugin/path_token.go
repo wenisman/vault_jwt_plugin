@@ -87,7 +87,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 
 	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
-		return logical.ErrorResponse(fmt.Sprintf("Invalid Token %#v \n secret:%s \n role:%s", err, secret.Key, roleName)), err
+		return logical.ErrorResponse(fmt.Sprintf("Invalid Token %#v \n role:%s", err, roleName)), err
 	}
 
 	validation := map[string]interface{}{
