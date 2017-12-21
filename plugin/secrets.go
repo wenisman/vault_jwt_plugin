@@ -23,6 +23,40 @@ func (backend *JwtBackend) secretLock(secretID string) *locksutil.LockEntry {
 	return locksutil.LockForKey(backend.secretLocks, secretID)
 }
 
+func (backend *JwtBackend) tidySecretEntries(storage logical.Storage) error {
+	// enumerate over all the secrets and remove any that are out of date
+	roles, err := storage.List("secrets")
+	if err != nil {
+		return fmt.Errorf("tidySecretEntries - Unable to retreive the Roles")
+	}
+
+	// TODO : clean this up, nested for loops are always nasty
+	for _, role := range roles {
+		secrets, err := storage.List(fmt.Sprintf("secrets/%s", role))
+		if err != nil {
+			return fmt.Errorf("tidySecretEntries - Unable to retrieve the Secrets")
+		}
+
+		for _, secret := range secrets {
+			entry, err := backend.getSecretEntry(storage, role, secret)
+
+			if err != nil {
+				return fmt.Errorf("tidySecretEntries - Unable to retrieve the individual secret %s/%s", role, secret)
+			}
+
+			if entry.Expiration.Before(time.Now()) == true {
+				err = backend.deleteSecretEntry(storage, role, secret)
+
+				if err != nil {
+					return fmt.Errorf("tidySecretEntries - Unable to remove the expired secret %s/%s", role, secret)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string, TTL int) (*secretStorageEntry, error) {
 	// create an UUID for the secret
 	secretID, _ := uuid.NewUUID()
