@@ -74,7 +74,13 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	secretID := role.SecretID
+	tokenID := token.Claims().Get("id").(string)
+	if tokenID != "" {
+		secretID = tokenID
+	}
+
+	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role secrets"), err
 	} else if secret == nil {
@@ -114,8 +120,13 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
+	secretID := role.SecretID
+	tokenID := token.Claims().Get("id").(string)
+	if tokenID != "" {
+		secretID = tokenID
+	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
 	if secret == nil {
 		// secret has probably expired so we will make a new one
 		secret, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)

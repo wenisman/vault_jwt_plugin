@@ -49,8 +49,8 @@ func (backend *JwtBackend) createSecret(storage logical.Storage, roleID string, 
 			Expiration:   time.Now().Add(time.Duration(TTL) * time.Second).UTC(),
 		}
 	}
-	// create a new secret, just use a HMAC of a UUID for now
 
+	// create a new secret, just use a HMAC of a UUID for now
 	if err := backend.setSecretEntry(storage, secretEntry); err != nil {
 		return nil, err
 	}
@@ -65,8 +65,9 @@ func (backend *JwtBackend) readSecret(storage logical.Storage, roleID string, se
 		return nil, fmt.Errorf("Secrets Role ID is not specified")
 	}
 
+	// no secret, just return nil
 	if secretID == "" {
-		return nil, fmt.Errorf("Secrets ID is not specified")
+		return nil, nil
 	}
 	secretEntry, err := backend.getSecretEntry(storage, roleID, secretID)
 
@@ -74,7 +75,8 @@ func (backend *JwtBackend) readSecret(storage logical.Storage, roleID string, se
 		return nil, err
 	}
 
-	if time.Now().UTC().After(secretEntry.Expiration) == true {
+	// check the time is not the default as this would be a pre-set secret
+	if secretEntry.Expiration.Equal(time.Time{}) == false && time.Now().UTC().After(secretEntry.Expiration) == true {
 		// the secret has expired, delete it and return nil
 		backend.deleteSecretEntry(storage, roleID, secretID)
 		secretEntry = nil
@@ -121,7 +123,7 @@ func (backend *JwtBackend) getSecretEntry(storage logical.Storage, roleID string
 	}
 
 	if secretID == "" {
-		return nil, fmt.Errorf("Secrets ID is not specified")
+		return nil, nil
 	}
 
 	var result secretStorageEntry
