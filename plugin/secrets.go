@@ -44,7 +44,7 @@ func (backend *JwtBackend) tidySecretEntries(storage logical.Storage) error {
 				return fmt.Errorf("tidySecretEntries - Unable to retrieve the individual secret %s/%s", role, secret)
 			}
 
-			if entry.Expiration.Before(time.Now()) == true {
+			if entry.Expiration.Equal(time.Time{}) == false && entry.Expiration.Before(time.Now()) == true {
 				err = backend.deleteSecretEntry(storage, role, secret)
 
 				if err != nil {
