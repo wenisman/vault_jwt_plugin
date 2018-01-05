@@ -11,7 +11,7 @@ func (backend *JwtBackend) tidySecrets(req *logical.Request, data *framework.Fie
 		return logical.ErrorResponse("tidySecrets - Unable to tidy the secrets"), err
 	}
 
-	return &logical.Response{}, nil
+	return &logical.Response{}, err
 }
 
 // set up the paths for the roles within vault
