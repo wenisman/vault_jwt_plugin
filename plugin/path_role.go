@@ -2,6 +2,7 @@ package josejwt
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
@@ -53,6 +54,11 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 	"password": {
 		Type:        framework.TypeString,
 		Description: "The type of token to be associated to the role [jws|jwt]",
+		Default:     "",
+	},
+	"secret": {
+		Type:        framework.TypeString,
+		Description: "The secret used to sign the token",
 		Default:     "",
 	},
 }
@@ -128,13 +134,25 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		role.RoleID = roleID.String()
 		role.HMAC = salt.GetHMAC(role.RoleID)
 
-		// create the secret
-		secretEntry, err = backend.createSecret(req.Storage, role.RoleID)
+		secretEntry, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to create secret entry %#v", err)), nil
 		}
 
-		role.SecretID = secretEntry.ID
+		// create the secret
+		secret := data.Get("secret").(string)
+		if secret != "" {
+			// set the secret key to the specified key after its been encrypted
+			secretEntry.Key = salt.GetHMAC(secret)
+			// remove the expiration on pre-set secrets
+			secretEntry.Expiration = time.Time{}
+			role.SecretID = secretEntry.ID
+		} else {
+			role.SecretID = ""
+		}
+
+		backend.setSecretEntry(req.Storage, secretEntry)
+
 	} else {
 		// update the role
 		secretEntry, err = backend.getSecretEntry(req.Storage, role.RoleID, role.SecretID)

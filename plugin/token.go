@@ -7,12 +7,15 @@ import (
 
 	"github.com/SermoDigital/jose/crypto"
 	"github.com/SermoDigital/jose/jws"
+	"github.com/google/uuid"
 	"github.com/hashicorp/vault/logical"
 )
 
 // TokenCreateEntry is the exposed structure for creating a token
 type TokenCreateEntry struct {
 	TTL int `json:"ttl" structs:"ttl" mapstructure:"ttl"`
+
+	ID string `json:"id" structs:"id" mapstructure:"id"`
 
 	ClaimName string `json:"claim_name" structs:"claim_name" mapstructure:"claim_name"`
 
@@ -30,6 +33,9 @@ type TokenCreateEntry struct {
 func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
 	claims := jws.Claims{}
 	var tokenClaims map[string]string
+
+	id, _ := uuid.NewUUID()
+	tokenID := id.String()
 
 	if createEntry.ClaimName != "" {
 		savedClaims, err := getTokenClaims(backend, storage, createEntry.ClaimName)
@@ -57,10 +63,16 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	if err != nil {
 		return nil, err
 	} else if secret == nil {
-		secret, err = backend.rotateSecret(storage, roleEntry.RoleID, roleEntry.SecretID)
+		// theres no secret so lets create a new secret for this token
+		secret, err = backend.createSecret(storage, roleEntry.RoleID, roleEntry.TokenTTL)
 		if err != nil {
 			return nil, err
 		}
+		secret.ID = tokenID
+		if err := backend.setSecretEntry(storage, secret); err != nil {
+			return nil, fmt.Errorf("Unable to set the secret entry")
+		}
+		token.Claims().Set("id", tokenID)
 	}
 
 	serializedToken, _ := token.Serialize([]byte(secret.Key))

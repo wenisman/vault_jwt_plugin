@@ -74,7 +74,13 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	secretID := role.SecretID
+	tokenID := token.Claims().Get("id").(string)
+	if tokenID != "" {
+		secretID = tokenID
+	}
+
+	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role secrets"), err
 	} else if secret == nil {
@@ -114,8 +120,21 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
+	secretID := role.SecretID
+	tokenID := token.Claims().Get("id").(string)
+	if tokenID != "" {
+		secretID = tokenID
+	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, role.SecretID)
+	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
+	if secret == nil {
+		// secret has probably expired so we will make a new one
+		secret, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
+	}
+	if err != nil {
+		return logical.ErrorResponse("Unable to regnerate the secret"), err
+	}
+
 	err = token.Validate([]byte(secret.Key), crypto.SigningMethodHS256)
 	if err != nil {
 		return logical.ErrorResponse("Invalid Token"), err
@@ -123,6 +142,10 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 
 	expiry := time.Now().Add(time.Duration(role.TokenTTL) * time.Second).UTC()
 	token.Claims().SetExpiration(expiry)
+
+	// make sure we update the expiry on the secret
+	secret.Expiration = expiry
+	backend.setSecretEntry(req.Storage, secret)
 
 	tokenData, _ := token.Serialize([]byte(secret.Key))
 	tokenOutput := map[string]interface{}{

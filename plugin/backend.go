@@ -103,6 +103,7 @@ func Backend(conf *logical.BackendConfig) *JwtBackend {
 			pathRole(backend),
 			pathLogin(backend),
 			pathClaims(backend),
+			pathSecrets(backend),
 		),
 	}
 
