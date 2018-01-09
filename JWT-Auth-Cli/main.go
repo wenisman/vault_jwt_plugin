@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/siteminder-au/vault-iam-auth/cmd"
+import "github.com/wenisman/vault_jwt_plugin/jwt-auth-cli/cmd"
 
 func main() {
 	cmd.Execute()

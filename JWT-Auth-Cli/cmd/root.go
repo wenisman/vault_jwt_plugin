@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/siteminder-au/vault-iam-auth/lib"
+	"github.com/wenisman/vault_jwt_plugin/jwt-auth-cli/lib"
 )
 
 // RootCmd represents the base command when called without any subcommands
