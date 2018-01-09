@@ -1,6 +1,6 @@
 FROM golang:latest as builder
 
-WORKDIR /go/src/github.com/wenisman/vault_jwt_plugin
+WORKDIR /go/src/github.com/wenisman/vault_jwt_plugin/JWT-Plugin
 
 RUN go get -d -v golang.org/x/net/html
 
@@ -30,7 +30,7 @@ EXPOSE ${VAULT_PORT}
 
 # set up the AWS Auth backend
 WORKDIR /vault/plugins
-COPY --from=builder /go/src/github.com/wenisman/vault_jwt_plugin/build /vault/plugins
+COPY --from=builder /go/src/github.com/wenisman/vault_jwt_plugin/JWT-Plugin/build /vault/plugins
 
 RUN chmod a+x *.sh
 RUN ./setup_vault.sh
