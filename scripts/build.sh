@@ -22,4 +22,4 @@ echo hello
 #CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-s" -a -installsuffix cgo -o build/jwtplugin
 #shasum -a 256 -p build/jwtplugin | cut -d ' ' -f 1 > "build/jwtplugin.sha1"
 
-#docker build -t vault-test-jwt .
+docker build -t $1 .

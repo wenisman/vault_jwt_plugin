@@ -2,5 +2,7 @@ name: jwt-plugin
 build:
   darwin:
     cmd: ../scripts/build.sh
+    args: ["vault-jwt-plugin-test"]
   linux:
     cmd: ../scripts/build.sh
+    args: ["vault-jwt-plugin-test"]

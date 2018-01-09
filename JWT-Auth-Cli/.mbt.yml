@@ -2,5 +2,7 @@ name: jwt-auth-cli
 build:
   darwin:
     cmd: ../scripts/build.sh
+    args: ["vault-cli-test"]
   linux:
     cmd: ../scripts/build.sh
+    args: ["vault-cli-test"]
