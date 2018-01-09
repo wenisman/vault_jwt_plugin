@@ -2,7 +2,7 @@
 
 set -ex
 
-echo "hello"
+echo hello
 
 #go get -v
 
