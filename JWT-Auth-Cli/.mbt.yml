@@ -1,5 +1,4 @@
-name: JWT-Auth-Cli
-dependencies:
+name: jwt-auth-cli
 build:
   darwin:
     cmd: ../scripts/build.sh
