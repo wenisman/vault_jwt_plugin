@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/siteminder-au/vault-iam-auth/lib"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wenisman/vault_jwt_plugin/jwt-auth-cli/lib"
 )
 
 var jwtCmd = &cobra.Command{
