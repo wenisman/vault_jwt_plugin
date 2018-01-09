@@ -1,7 +1,0 @@
-name: JWT-Plugin
-dependencies:
-build:
-  darwin:
-    cmd: ../scripts/build.sh
-  linux:
-    cmd: ../scripts/build.sh
