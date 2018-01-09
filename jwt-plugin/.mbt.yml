@@ -1,0 +1,6 @@
+name: jwt-plugin
+build:
+  darwin:
+    cmd: ../scripts/build.sh
+  linux:
+    cmd: ../scripts/build.sh
