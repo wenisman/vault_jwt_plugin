@@ -17,11 +17,16 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	response, _ := json.Marshal(payload)
+	response, err := json.Marshal(payload)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response)
+
+	if err != nil {
+		w.Write([]byte("Unable to decode json json"))
+	} else {
+		w.Write(response)
+	}
 }
 
 func (s *Server) issueJwt(w http.ResponseWriter, r *http.Request) {

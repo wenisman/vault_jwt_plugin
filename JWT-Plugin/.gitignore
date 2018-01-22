@@ -1,3 +1,4 @@
 .vscode/
 build/jwtplugin*
 vault_jwt_plugin
+jwt-plugin

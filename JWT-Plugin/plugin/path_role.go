@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -64,14 +65,14 @@ var createRoleSchema = map[string]*framework.FieldSchema{
 }
 
 // remove the specified role from the storage
-func (backend *JwtBackend) removeRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) removeRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("Unable to remove, missing role name"), nil
 	}
 
 	// get the role to make sure it exists and to get the role id
-	role, err := backend.getRoleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +81,10 @@ func (backend *JwtBackend) removeRole(req *logical.Request, data *framework.Fiel
 	}
 
 	// remove the secrets
-	backend.deleteSecretEntry(req.Storage, role.RoleID, role.SecretID)
+	backend.deleteSecretEntry(ctx, req.Storage, role.RoleID, role.SecretID)
 
 	// remove the role
-	if err := backend.deleteRoleEntry(req.Storage, roleName); err != nil {
+	if err := backend.deleteRoleEntry(ctx, req.Storage, roleName); err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Unable to remove role %s", roleName)), err
 	}
 
@@ -91,9 +92,9 @@ func (backend *JwtBackend) removeRole(req *logical.Request, data *framework.Fiel
 }
 
 // read the current role from the inputs and return it if it exists
-func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) readRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
-	role, err := backend.getRoleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("Error reading role"), err
 	}
@@ -108,13 +109,13 @@ func (backend *JwtBackend) readRole(req *logical.Request, data *framework.FieldD
 
 // create the role within plugin, this will provide the access for applications
 // to be able to create tokens down the line
-func (backend *JwtBackend) createRole(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("Role name not supplied"), nil
 	}
 
-	role, err := backend.getRoleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("Error reading role"), err
 	}
@@ -134,7 +135,7 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 		role.RoleID = roleID.String()
 		role.HMAC = salt.GetHMAC(role.RoleID)
 
-		secretEntry, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
+		secretEntry, err = backend.createSecret(ctx, req.Storage, role.RoleID, role.TokenTTL)
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to create secret entry %#v", err)), nil
 		}
@@ -151,11 +152,11 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 			role.SecretID = ""
 		}
 
-		backend.setSecretEntry(req.Storage, secretEntry)
+		backend.setSecretEntry(ctx, req.Storage, secretEntry)
 
 	} else {
 		// update the role
-		secretEntry, err = backend.getSecretEntry(req.Storage, role.RoleID, role.SecretID)
+		secretEntry, err = backend.getSecretEntry(ctx, req.Storage, role.RoleID, role.SecretID)
 		if err != nil {
 			return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve secret entry %#v", err)), nil
 		}
@@ -176,10 +177,10 @@ func (backend *JwtBackend) createRole(req *logical.Request, data *framework.Fiel
 	password := data.Get("password").(string)
 	if password != "" {
 		secretEntry.Password = salt.GetHMAC(password)
-		backend.setSecretEntry(req.Storage, secretEntry)
+		backend.setSecretEntry(ctx, req.Storage, secretEntry)
 	}
 
-	if err := backend.setRoleEntry(req.Storage, *role); err != nil {
+	if err := backend.setRoleEntry(ctx, req.Storage, *role); err != nil {
 		return logical.ErrorResponse("Error saving role"), err
 	}
 

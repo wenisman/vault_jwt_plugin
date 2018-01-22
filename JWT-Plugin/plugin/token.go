@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type TokenCreateEntry struct {
 	TokenType string `json:"token_type" structs:"token_type" mapstructure:"token_type"`
 }
 
-func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
+func createJwtToken(ctx context.Context, backend *JwtBackend, storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
 	claims := jws.Claims{}
 	var tokenClaims map[string]string
 
@@ -38,7 +39,7 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	tokenID := id.String()
 
 	if createEntry.ClaimName != "" {
-		savedClaims, err := getTokenClaims(backend, storage, createEntry.ClaimName)
+		savedClaims, err := getTokenClaims(ctx, backend, storage, createEntry.ClaimName)
 		if err != nil {
 			return nil, err
 		}
@@ -59,17 +60,17 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	token.Claims().Set("role-name", roleEntry.Name)
 
 	// read the secret for this role
-	secret, err := backend.readSecret(storage, roleEntry.RoleID, roleEntry.SecretID)
+	secret, err := backend.readSecret(ctx, storage, roleEntry.RoleID, roleEntry.SecretID)
 	if err != nil {
 		return nil, err
 	} else if secret == nil {
 		// theres no secret so lets create a new secret for this token
-		secret, err = backend.createSecret(storage, roleEntry.RoleID, roleEntry.TokenTTL)
+		secret, err = backend.createSecret(ctx, storage, roleEntry.RoleID, roleEntry.TokenTTL)
 		if err != nil {
 			return nil, err
 		}
 		secret.ID = tokenID
-		if err := backend.setSecretEntry(storage, secret); err != nil {
+		if err := backend.setSecretEntry(ctx, storage, secret); err != nil {
 			return nil, fmt.Errorf("Unable to set the secret entry")
 		}
 		token.Claims().Set("id", tokenID)
@@ -83,14 +84,14 @@ func createJwtToken(backend *JwtBackend, storage logical.Storage, createEntry To
 	return tokenOutput, nil
 }
 
-func (backend *JwtBackend) createTokenEntry(storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
+func (backend *JwtBackend) createTokenEntry(ctx context.Context, storage logical.Storage, createEntry TokenCreateEntry, roleEntry *RoleStorageEntry) (map[string]interface{}, error) {
 	createEntry.TokenType = strings.ToLower(createEntry.TokenType)
 
 	switch createEntry.TokenType {
 	case "jws":
 		return nil, nil
 	case "jwt":
-		return createJwtToken(backend, storage, createEntry, roleEntry)
+		return createJwtToken(ctx, backend, storage, createEntry, roleEntry)
 	default:
 		// throw an error
 		return nil, fmt.Errorf("unsupported token type %s", createEntry.TokenType)

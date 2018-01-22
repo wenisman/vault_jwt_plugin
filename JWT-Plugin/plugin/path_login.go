@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -23,18 +24,18 @@ var loginSchema = map[string]*framework.FieldSchema{
 }
 
 // Login for the role using a pre-assigned password.
-func (backend *JwtBackend) authLoginLocal(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) authLoginLocal(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	roleName := data.Get("role-name").(string)
 	password := data.Get("password").(string)
 
 	// read role and validate the password.
-	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
+	roleEntry, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Error Retrieving role '%s'", roleName)), nil
 	}
 
-	secretEntry, err := backend.getSecretEntry(req.Storage, roleEntry.RoleID, roleEntry.SecretID)
+	secretEntry, err := backend.getSecretEntry(ctx, req.Storage, roleEntry.RoleID, roleEntry.SecretID)
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Error Retrieving secrets for role '%s'", roleName)), nil
 	}

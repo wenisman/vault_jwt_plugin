@@ -90,7 +90,12 @@ func GetJWT(client HTTPClient, clientToken string, roleName string, claimName st
 
 	// construct the request to send
 	vaultURL := viper.Get("vault-url")
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/v1/auth/jwtplugin/token/issue", vaultURL), buf)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/v1/auth/jwtplugin/token/issue", vaultURL), buf)
+
+	if err != nil {
+		return "", err
+	}
+
 	req.Header.Add("X-Vault-Token", clientToken)
 	req.Header.Add("Content-Type", "application/json")
 
@@ -118,7 +123,11 @@ func ValidateJWT(client HTTPClient, jwt string) (string, error) {
 
 	buf := bytes.NewReader([]byte(fmt.Sprintf("{ \"token\": \"%s\" }", jwt)))
 
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/v1/auth/jwtplugin/token/validate", vaultURL), buf)
+	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/v1/auth/jwtplugin/token/validate", vaultURL), buf)
+	if err != nil {
+		return "", nil
+	}
+
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)

@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -56,7 +57,7 @@ var createTokenSchema = map[string]*framework.FieldSchema{
 }
 
 // Provides basic token validation for a provided jwt token
-func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) validateToken(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	byteToken := []byte(data.Get("token").(string))
 	token, err := jws.ParseJWT(byteToken)
 
@@ -69,7 +70,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		roleName = token.Claims().Get("role-name").(string)
 	}
 
-	role, err := backend.getRoleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
@@ -80,7 +81,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 		secretID = tokenID
 	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
+	secret, err := backend.readSecret(ctx, req.Storage, role.RoleID, secretID)
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role secrets"), err
 	} else if secret == nil {
@@ -103,7 +104,7 @@ func (backend *JwtBackend) validateToken(req *logical.Request, data *framework.F
 }
 
 // refresh the provided token so that it can live on...
-func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) refreshToken(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	byteToken := []byte(data.Get("token").(string))
 	token, err := jws.ParseJWT(byteToken)
 
@@ -116,7 +117,7 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 		roleName = token.Claims().Get("role-name").(string)
 	}
 
-	role, err := backend.getRoleEntry(req.Storage, roleName)
+	role, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if err != nil {
 		return logical.ErrorResponse("unable to retrieve role details"), err
 	}
@@ -126,10 +127,10 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 		secretID = tokenID
 	}
 
-	secret, err := backend.readSecret(req.Storage, role.RoleID, secretID)
+	secret, err := backend.readSecret(ctx, req.Storage, role.RoleID, secretID)
 	if secret == nil {
 		// secret has probably expired so we will make a new one
-		secret, err = backend.createSecret(req.Storage, role.RoleID, role.TokenTTL)
+		secret, err = backend.createSecret(ctx, req.Storage, role.RoleID, role.TokenTTL)
 	}
 	if err != nil {
 		return logical.ErrorResponse("Unable to regnerate the secret"), err
@@ -145,7 +146,7 @@ func (backend *JwtBackend) refreshToken(req *logical.Request, data *framework.Fi
 
 	// make sure we update the expiry on the secret
 	secret.Expiration = expiry
-	backend.setSecretEntry(req.Storage, secret)
+	backend.setSecretEntry(ctx, req.Storage, secret)
 
 	tokenData, _ := token.Serialize([]byte(secret.Key))
 	tokenOutput := map[string]interface{}{
@@ -176,12 +177,12 @@ func contains(array []string, value string) bool {
 }
 
 // create the basic jwt token with an expiry within the claim
-func (backend *JwtBackend) createToken(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createToken(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	// use the IAM role from the authentication
 	roleName := getRoleName(req.DisplayName)
 
 	// get the role by name
-	roleEntry, err := backend.getRoleEntry(req.Storage, roleName)
+	roleEntry, err := backend.getRoleEntry(ctx, req.Storage, roleName)
 	if roleEntry == nil || err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Role name '%s' not recognised", roleName)), nil
 	}
@@ -207,7 +208,7 @@ func (backend *JwtBackend) createToken(req *logical.Request, data *framework.Fie
 	}
 	tokenEntry.TokenType = roleEntry.TokenType
 
-	token, err := backend.createTokenEntry(req.Storage, tokenEntry, roleEntry)
+	token, err := backend.createTokenEntry(ctx, req.Storage, tokenEntry, roleEntry)
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Error creating token, %#v", err)), err
 	}

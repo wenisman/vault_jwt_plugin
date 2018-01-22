@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -45,7 +46,7 @@ func (backend *JwtBackend) roleLock(roleName string) *locksutil.LockEntry {
 }
 
 // roleSave will persist the role in the data store
-func (backend *JwtBackend) setRoleEntry(storage logical.Storage, role RoleStorageEntry) error {
+func (backend *JwtBackend) setRoleEntry(ctx context.Context, storage logical.Storage, role RoleStorageEntry) error {
 	if role.Name == "" {
 		return fmt.Errorf("Unable to save, invalid name in role")
 	}
@@ -61,7 +62,7 @@ func (backend *JwtBackend) setRoleEntry(storage logical.Storage, role RoleStorag
 		return fmt.Errorf("Error converting entry to JSON: %#v", err)
 	}
 
-	if err := storage.Put(entry); err != nil {
+	if err := storage.Put(ctx, entry); err != nil {
 		return fmt.Errorf("Error saving role: %#v", err)
 	}
 
@@ -69,7 +70,7 @@ func (backend *JwtBackend) setRoleEntry(storage logical.Storage, role RoleStorag
 }
 
 // deleteRoleEntry this will remove the role with specified name
-func (backend *JwtBackend) deleteRoleEntry(storage logical.Storage, roleName string) error {
+func (backend *JwtBackend) deleteRoleEntry(ctx context.Context, storage logical.Storage, roleName string) error {
 	if roleName == "" {
 		return fmt.Errorf("missing role name")
 	}
@@ -79,18 +80,18 @@ func (backend *JwtBackend) deleteRoleEntry(storage logical.Storage, roleName str
 	lock.RLock()
 	defer lock.RUnlock()
 
-	return storage.Delete(fmt.Sprintf("role/%s", roleName))
+	return storage.Delete(ctx, fmt.Sprintf("role/%s", roleName))
 }
 
 // getRoleEntry grabs the read lock and fetches the options of an role from the storage
-func (backend *JwtBackend) getRoleEntry(storage logical.Storage, roleName string) (*RoleStorageEntry, error) {
+func (backend *JwtBackend) getRoleEntry(ctx context.Context, storage logical.Storage, roleName string) (*RoleStorageEntry, error) {
 	if roleName == "" {
 		return nil, fmt.Errorf("missing role name")
 	}
 	roleName = strings.ToLower(roleName)
 
 	var result RoleStorageEntry
-	if entry, err := storage.Get(fmt.Sprintf("role/%s", roleName)); err != nil {
+	if entry, err := storage.Get(ctx, fmt.Sprintf("role/%s", roleName)); err != nil {
 		return nil, err
 	} else if entry == nil {
 		return nil, nil

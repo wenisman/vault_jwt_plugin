@@ -17,7 +17,7 @@ services:
       - CONSUL_KEY=""
   
   vault:
-    build: .
+    build: jwt-plugin
     environment:
       - VAULT_PORT=8201
     links: 

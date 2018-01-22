@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/vault/helper/locksutil"
@@ -18,7 +19,7 @@ func (backend *JwtBackend) claimLock(name string) *locksutil.LockEntry {
 }
 
 // Save a set of claims by name so that they can be addressed later
-func setTokenClaims(backend *JwtBackend, storage logical.Storage, name string, claims TokenClaims) error {
+func setTokenClaims(ctx context.Context, backend *JwtBackend, storage logical.Storage, name string, claims TokenClaims) error {
 	lock := backend.claimLock(name)
 	lock.RLock()
 	defer lock.RUnlock()
@@ -28,12 +29,12 @@ func setTokenClaims(backend *JwtBackend, storage logical.Storage, name string, c
 		return err
 	}
 
-	return storage.Put(entry)
+	return storage.Put(ctx, entry)
 }
 
 // Get the set of claims by the name provided
-func getTokenClaims(backend *JwtBackend, storage logical.Storage, name string) (*TokenClaims, error) {
-	entry, err := storage.Get(fmt.Sprintf("claims/%s", name))
+func getTokenClaims(ctx context.Context, backend *JwtBackend, storage logical.Storage, name string) (*TokenClaims, error) {
+	entry, err := storage.Get(ctx, fmt.Sprintf("claims/%s", name))
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func getTokenClaims(backend *JwtBackend, storage logical.Storage, name string) (
 }
 
 // remove the claims by the specified name
-func removeTokenClaims(backend *JwtBackend, storage logical.Storage, name string) error {
+func removeTokenClaims(ctx context.Context, backend *JwtBackend, storage logical.Storage, name string) error {
 	lock := backend.claimLock(name)
 	lock.RLock()
 	defer lock.RUnlock()
@@ -55,5 +56,5 @@ func removeTokenClaims(backend *JwtBackend, storage logical.Storage, name string
 		return fmt.Errorf("Claim name is required")
 	}
 
-	return storage.Delete(fmt.Sprintf("claims/%s", name))
+	return storage.Delete(ctx, fmt.Sprintf("claims/%s", name))
 }

@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/fatih/structs"
@@ -42,9 +43,9 @@ func (backend *JwtBackend) keyLock(keyName string) *locksutil.LockEntry {
 	return locksutil.LockForKey(backend.keyLocks, keyName)
 }
 
-func (backend *JwtBackend) createUpdateKey(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createUpdateKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	keyName := data.Get("name").(string)
-	key, err := backend.getKeyEntry(req.Storage, keyName)
+	key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
 	if err != nil {
 		return logical.ErrorResponse("Error reading key"), err
 	}
@@ -56,15 +57,15 @@ func (backend *JwtBackend) createUpdateKey(req *logical.Request, data *framework
 	if err := mapstructure.Decode(data.Raw, &storageEntry); err != nil {
 		return logical.ErrorResponse("Error decoding role"), err
 	}
-	backend.setKeyEntry(req.Storage, storageEntry)
+	backend.setKeyEntry(ctx, req.Storage, storageEntry)
 
 	return &logical.Response{}, nil
 }
 
-func (backend *JwtBackend) readKey(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) readKey(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	keyName := data.Get("name").(string)
 
-	key, err := backend.getKeyEntry(req.Storage, keyName)
+	key, err := backend.getKeyEntry(ctx, req.Storage, keyName)
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("Unable to retrieve key %s", keyName)), nil
 	} else if key == nil {

@@ -1,6 +1,7 @@
 package josejwt
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/vault/logical"
@@ -20,7 +21,7 @@ var createClaimSchema = map[string]*framework.FieldSchema{
 }
 
 // create or update the token claims
-func (backend *JwtBackend) createUpdateTokenClaims(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) createUpdateTokenClaims(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	var claims TokenClaims
 	if err := mapstructure.Decode(data.Raw, &claims); err != nil {
 		return logical.ErrorResponse("Error decoding claims"), err
@@ -31,7 +32,7 @@ func (backend *JwtBackend) createUpdateTokenClaims(req *logical.Request, data *f
 		return logical.ErrorResponse("Claim name not provided"), nil
 	}
 
-	if err := setTokenClaims(backend, req.Storage, name, claims); err != nil {
+	if err := setTokenClaims(ctx, backend, req.Storage, name, claims); err != nil {
 		return logical.ErrorResponse("Unable to save token claims"), err
 	}
 
@@ -43,13 +44,13 @@ func (backend *JwtBackend) createUpdateTokenClaims(req *logical.Request, data *f
 }
 
 // delete the claim by name, useful for the tidy operations later
-func (backend *JwtBackend) removeTokenClaims(req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (backend *JwtBackend) removeTokenClaims(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 	if name == "" {
 		return logical.ErrorResponse("Claim name is required"), nil
 	}
 
-	if err := removeTokenClaims(backend, req.Storage, name); err != nil {
+	if err := removeTokenClaims(ctx, backend, req.Storage, name); err != nil {
 		return logical.ErrorResponse("Unable to remove claim"), err
 	}
 
